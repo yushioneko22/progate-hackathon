@@ -1,16 +1,19 @@
 # progate-hackathon-1
 
-シンプルな Todo アプリ。フロント = Next.js / バックエンド = FastAPI / DB = PostgreSQL。Docker Compose で一括起動できます。
+シンプルな Todo アプリ。クライアントは **Web (Next.js)** と **モバイル (React Native / Expo)** の 2 系統、バックエンドは **FastAPI**、DB は **PostgreSQL**。バックエンドと DB は Docker Compose で一括起動できます。
 
 ## 構成
 
 ```
 apps/
 ├── api/          FastAPI (routers → services → repositories → models の4層)
-└── web/          Next.js (App Router, React 19)
+├── web/          Next.js (App Router, React 19) — ブラウザ向け
+└── mobile/       React Native (Expo SDK 54) — iOS / Web プレビュー
 .github/workflows/ci.yml   lint / typecheck / test / Docker build
-docker-compose.yml         dev 用ホットリロード構成
+docker-compose.yml         api + web + db を起動 (mobile はホスト側で起動)
 ```
+
+> モバイルアプリ (Expo / Metro) は Docker と相性が悪いためコンテナ化していません。`db` と `api` を Docker で立ち上げ、`mobile` はホストで `pnpm dev:mobile` を実行します。
 
 | Layer            | 役割                              | 場所                     |
 | ---------------- | --------------------------------- | ------------------------ |
@@ -25,18 +28,18 @@ docker-compose.yml         dev 用ホットリロード構成
 
 ## 1. 必要なツール
 
-Docker Compose 経由で起動するなら **Docker だけ** あれば動きます。コンテナの外で開発するなら Node / Python ツールチェインも必要です。
+Web / API / DB の動作確認だけなら Docker があれば動きます。モバイルアプリも触る場合は Node.js + pnpm が追加で必要です。
 
-| ツール                              | バージョン   | 必須          | 用途                              | インストール例                                                  |
-| ----------------------------------- | ------------ | ------------- | --------------------------------- | --------------------------------------------------------------- |
-| Docker Desktop (or Docker + Compose) | 最新         | ✅ 必須       | コンテナ起動                      | <https://www.docker.com/products/docker-desktop/>               |
-| Git                                 | 任意         | ✅ 必須       | クローン                          | `brew install git` など                                         |
-| Node.js                             | 22+          | (任意)        | コンテナ外で web を動かす場合     | `brew install node@22` / nvm / volta                            |
-| pnpm                                | 10           | (任意)        | 同上                              | `corepack enable && corepack prepare pnpm@10.5.0 --activate`    |
-| Python                              | 3.12         | (任意)        | コンテナ外で api を動かす場合     | `brew install python@3.12` / pyenv                              |
-| [uv](https://docs.astral.sh/uv/)    | 0.5+         | (任意)        | 同上 (Python の依存管理)          | `curl -LsSf https://astral.sh/uv/install.sh \| sh`              |
-
-> 動作確認だけしたいメンバーは **Docker のみで十分** です。
+| ツール                              | バージョン | 必須                       | 用途                                | インストール例                                                |
+| ----------------------------------- | ---------- | -------------------------- | ----------------------------------- | ------------------------------------------------------------- |
+| Docker Desktop                      | 最新       | ✅ Web/API/DB に必須       | コンテナ起動                        | <https://www.docker.com/products/docker-desktop/>             |
+| Git                                 | 任意       | ✅ 必須                    | クローン                            | `brew install git` など                                       |
+| Node.js                             | 22+        | ✅ モバイル動作確認に必須  | Expo / pnpm                         | `brew install node@22` / nvm / volta                          |
+| pnpm                                | 10         | ✅ モバイル動作確認に必須  | パッケージ管理                      | `corepack enable && corepack prepare pnpm@10.5.0 --activate`  |
+| Expo Go (実機 iPhone)               | 最新       | iOS 実機で確認するなら必須 | アプリを iPhone で起動              | App Store で「Expo Go」をインストール                         |
+| Xcode (Mac)                         | 最新       | iOS Simulator を使うなら   | iOS Simulator を起動                | Mac App Store                                                 |
+| Python                              | 3.12       | (任意)                     | コンテナ外で api を開発する場合     | `brew install python@3.12` / pyenv                            |
+| [uv](https://docs.astral.sh/uv/)    | 0.5+       | (任意)                     | 同上 (Python の依存管理)            | `curl -LsSf https://astral.sh/uv/install.sh \| sh`            |
 
 ---
 
@@ -157,7 +160,75 @@ docker compose exec db psql -U todo -d todo -c "SELECT id, title, completed FROM
 
 ---
 
-## 4. 停止・再起動・リセット
+## 4. モバイルアプリ (Expo) を起動する
+
+iPhone 実機 / iOS Simulator / ブラウザ (Expo Web) の 3 通りで確認できます。**バックエンドは Docker Compose で先に起動しておいてください**(セクション 2 参照)。
+
+### 4-1. 初回セットアップ
+
+```sh
+pnpm install   # ルートで実行。apps/mobile の依存も入る
+```
+
+### 4-2. 起動
+
+ルートディレクトリで:
+
+```sh
+pnpm dev:mobile        # Expo dev サーバーを起動 (QR コード表示)
+# またはプラットフォーム指定:
+pnpm dev:mobile:ios    # iOS Simulator を直接立ち上げる
+pnpm dev:mobile:web    # ブラウザで開く (http://localhost:8081)
+```
+
+ターミナルに QR コードが表示されます。
+
+### 4-3. iOS 実機 (iPhone) で確認
+
+1. iPhone と Mac を **同じ Wi-Fi** に接続
+2. iPhone の App Store で **Expo Go** をインストール
+3. **`apps/mobile/.env` を作成し、Mac の LAN IP を指定**:
+
+   ```sh
+   cp apps/mobile/.env.example apps/mobile/.env
+   # Mac の LAN IP を確認 (例: 192.168.1.42)
+   ipconfig getifaddr en0
+   # apps/mobile/.env を編集
+   # EXPO_PUBLIC_API_URL=http://192.168.1.42:8787
+   ```
+
+   > 実機からは `localhost` が iPhone 自身を指すため、Mac の LAN IP を指定する必要があります。
+   > Expo dev サーバーを再起動して反映してください。
+
+4. iPhone の **カメラ** または **Expo Go** で QR コードをスキャン → アプリが起動
+
+### 4-4. iOS Simulator で確認 (Xcode 必要)
+
+```sh
+pnpm dev:mobile:ios
+```
+
+初回は Simulator のダウンロードに時間がかかります。`EXPO_PUBLIC_API_URL` は不要(Simulator は `localhost` でホストに到達できます)。
+
+### 4-5. ブラウザ (Expo Web) で確認
+
+```sh
+pnpm dev:mobile:web
+```
+
+<http://localhost:8081> が開きます。Web 版 (Next.js) と見た目は違いますが、同じ API を叩いて同じ動作をします。
+
+### 4-6. 動作確認のポイント
+
+- タスクを追加 → リストに表示される
+- チェックボックスタップ → 取り消し線
+- 削除タップ → リストから消える
+- アプリをリロード(`r` を Expo CLI で押す)しても状態が保持される
+- 同じ DB を見ているので、Web 版で追加したタスクがモバイル版にも出る (リロード後)
+
+---
+
+## 5. 停止・再起動・リセット
 
 ```sh
 # 一時停止 (コンテナを停止、データは保持)
@@ -179,7 +250,7 @@ docker compose up
 
 ---
 
-## 5. トラブルシューティング
+## 6. トラブルシューティング
 
 ### 起動時に `port is already allocated` / `address already in use`
 
@@ -231,9 +302,31 @@ docker compose up --build
 
 これで Postgres のデータも削除され、まっさらな状態から立ち上がります。
 
+### Expo: iPhone 実機からアプリは開けたが「API 500 / Network request failed」
+
+`EXPO_PUBLIC_API_URL` が `localhost` のままになっている可能性が高いです。実機から `localhost` は iPhone 自身を指すため、Mac の LAN IP に書き換えて Expo dev サーバーを再起動してください (セクション 4-3 参照)。  
+また iPhone と Mac が同じ Wi-Fi にいるか、Mac のファイアウォールがブロックしていないかも確認してください。
+
+### Expo: `Unable to resolve module ...` / バンドルが壊れているように見える
+
+```sh
+pnpm --filter @app/mobile start --clear   # Metro のキャッシュをクリア
+```
+
+それでも直らない場合:
+
+```sh
+rm -rf apps/mobile/node_modules apps/mobile/.expo node_modules
+pnpm install
+```
+
+### Expo Go の SDK バージョン不一致と言われる
+
+Expo Go アプリ側のバージョンと本プロジェクトの SDK が一致している必要があります。App Store で Expo Go を最新に更新してください。
+
 ---
 
-## 6. Docker を使わずローカルで動かす場合
+## 7. Docker を使わずローカルで動かす場合
 
 開発をガッツリやりたい人向け。コンテナ内 `pnpm install` を毎回待たなくて済むので、頻繁にコードを変更するならこちらが速いです。
 
@@ -261,12 +354,12 @@ DATABASE_URL=postgresql+asyncpg://todo:todo@localhost:5432/todo \
 
 ---
 
-## 7. テスト / lint / 型チェック
+## 8. テスト / lint / 型チェック
 
 ```sh
 pnpm test         # API テスト (pytest, SQLite in-memory)
-pnpm lint         # ruff + next lint
-pnpm typecheck    # mypy + tsc --noEmit
+pnpm lint         # ruff + next lint + mobile eslint
+pnpm typecheck    # mypy + tsc --noEmit (web & mobile)
 ```
 
 個別実行も可:
@@ -274,14 +367,16 @@ pnpm typecheck    # mypy + tsc --noEmit
 ```sh
 pnpm run test:api
 pnpm run lint:web
+pnpm run lint:mobile
 pnpm run lint:api
 pnpm run typecheck:web
+pnpm run typecheck:mobile
 pnpm run typecheck:api
 ```
 
 ---
 
-## 8. DB マイグレーション
+## 9. DB マイグレーション
 
 新しいリビジョンを追加:
 
@@ -295,12 +390,13 @@ uv run alembic upgrade head
 
 ---
 
-## 9. CI
+## 10. CI
 
-`.github/workflows/ci.yml` が 3 ジョブを並列実行します。
+`.github/workflows/ci.yml` が 4 ジョブを並列実行します。
 
 1. **API**: ruff / mypy / pytest
 2. **Web**: next lint / tsc / next build
-3. **Docker build**: api と web の本番イメージビルド (GitHub Actions Cache 利用)
+3. **Mobile**: eslint / tsc (Expo / RN)
+4. **Docker build**: api と web の本番イメージビルド (GitHub Actions Cache 利用)
 
 `main` へのプッシュと PR で発火します。

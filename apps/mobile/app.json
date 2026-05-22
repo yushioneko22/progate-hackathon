@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "Todo",
+    "slug": "todo",
+    "version": "0.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.progatehackathon.todo"
+    },
+    "android": {
+      "package": "com.progatehackathon.todo"
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": []
+  }
+}

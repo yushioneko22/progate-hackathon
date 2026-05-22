@@ -51,6 +51,24 @@ jobs:
       - name: Build
         run: pnpm --filter @app/web build
 
+  mobile:
+    name: Mobile (Expo / React Native)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.5.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Lint
+        run: pnpm --filter @app/mobile lint
+      - name: Type-check
+        run: pnpm --filter @app/mobile typecheck
+
   docker:
     name: Docker build
     runs-on: ubuntu-latest
