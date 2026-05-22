@@ -1,0 +1,29 @@
+{
+  "name": "progate-hackathon-1",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.5.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "docker compose up --build",
+    "dev:web": "pnpm --filter @app/web dev",
+    "dev:api": "cd apps/api && uv run uvicorn app.main:app --reload --port 8787",
+    "build": "pnpm --filter @app/web build",
+    "lint:web": "pnpm --filter @app/web lint",
+    "lint:api": "cd apps/api && uv run ruff check .",
+    "lint": "pnpm run lint:web && pnpm run lint:api",
+    "typecheck:web": "pnpm --filter @app/web typecheck",
+    "typecheck:api": "cd apps/api && uv run mypy app",
+    "typecheck": "pnpm run typecheck:web && pnpm run typecheck:api",
+    "test:api": "cd apps/api && uv run pytest -q",
+    "test": "pnpm run test:api",
+    "db:migrate": "cd apps/api && uv run alembic upgrade head"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.3"
+  }
+}

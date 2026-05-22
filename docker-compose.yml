@@ -1,0 +1,60 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-todo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-todo}
+      POSTGRES_DB: ${POSTGRES_DB:-todo}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-todo}"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile.dev
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-todo}:${POSTGRES_PASSWORD:-todo}@db:5432/${POSTGRES_DB:-todo}
+      CORS_ORIGINS: '["http://localhost:3000"]'
+    ports:
+      - "8787:8787"
+    volumes:
+      - ./apps/api/app:/app/app
+      - ./apps/api/alembic:/app/alembic
+      - ./apps/api/alembic.ini:/app/alembic.ini
+      - ./apps/api/pyproject.toml:/app/pyproject.toml
+      - ./apps/api/uv.lock:/app/uv.lock
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile.dev
+    depends_on:
+      - api
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8787
+      WATCHPACK_POLLING: "true"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./apps/web:/repo/apps/web
+      - ./package.json:/repo/package.json
+      - ./pnpm-workspace.yaml:/repo/pnpm-workspace.yaml
+      - ./pnpm-lock.yaml:/repo/pnpm-lock.yaml
+      - web-node-modules:/repo/node_modules
+      - web-app-node-modules:/repo/apps/web/node_modules
+
+volumes:
+  postgres-data:
+  web-node-modules:
+  web-app-node-modules:
