@@ -666,3 +666,41 @@ html, body {
   line-height: 1;
   font-weight: 300;
 }
+
+/* --- CREATE ALBUM MODAL --- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(28, 18, 8, 0.5);
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.modal-sheet {
+  background: var(--bg);
+  width: 100%;
+  max-width: 430px;
+  border-radius: 16px 16px 0 0;
+  padding: 24px 24px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.modal-handle {
+  width: 40px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin: 0 auto -8px;
+}
+
+.modal-title {
+  font-family: 'Noto Serif JP', serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--dark);
+  text-align: center;
+}

@@ -1,4 +1,9 @@
+'use client';
+
+import { useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { token } from '@/lib/token';
 
 function PolaroidPhoto() {
   return (
@@ -35,6 +40,11 @@ function PolaroidPhoto() {
 }
 
 export default function LandingPage() {
+  const router = useRouter();
+  useEffect(() => {
+    if (token.get()) router.replace('/albums');
+  }, [router]);
+
   return (
     <div className="landing">
       {/* Polaroid card */}
