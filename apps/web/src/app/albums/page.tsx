@@ -1,28 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { api } from '@/lib/api';
+import { token } from '@/lib/token';
+import type { Album } from '@/lib/types';
 
-type AlbumStatus = 'sealed' | 'opened';
 type FilterTab = 'all' | 'sealed' | 'opened';
-
-interface Album {
-  id: number;
-  title: string;
-  date: string;
-  exp: number;
-  members: number;
-  status: AlbumStatus;
-  daysLeft?: number;
-  thumbColor?: string;
-}
-
-const ALBUMS: Album[] = [
-  { id: 1, title: '2026 夏フェス', date: '7/12 – 7/14', exp: 24, members: 6, status: 'sealed', daysLeft: 142 },
-  { id: 2, title: '京都・卒業旅行', date: '3/20 – 3/24', exp: 19, members: 4, status: 'sealed', daysLeft: 365 },
-  { id: 3, title: '研究室飲み会', date: '5/02', exp: 12, members: 8, status: 'opened', thumbColor: 'amber' },
-  { id: 4, title: '海・8月', date: '8/03 – 8/05', exp: 27, members: 5, status: 'opened', thumbColor: 'ocean' },
-  { id: 5, title: '冬の信州', date: '12/28 – 1/03', exp: 21, members: 3, status: 'sealed', daysLeft: 89 },
-];
 
 function AmberThumb() {
   return (
@@ -50,32 +34,6 @@ function AmberThumb() {
   );
 }
 
-function OceanThumb() {
-  return (
-    <svg viewBox="0 0 120 120" width="120" height="120" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="oc-sky" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#5BA3C9" />
-          <stop offset="60%" stopColor="#87CEEB" />
-          <stop offset="100%" stopColor="#A8D8EA" />
-        </linearGradient>
-        <radialGradient id="oc-sun" cx="70%" cy="25%" r="30%">
-          <stop offset="0%" stopColor="#FFF4CC" stopOpacity="0.95" />
-          <stop offset="100%" stopColor="#87CEEB" stopOpacity="0" />
-        </radialGradient>
-      </defs>
-      <rect width="120" height="120" fill="url(#oc-sky)" />
-      <circle cx="84" cy="28" r="22" fill="url(#oc-sun)" />
-      <circle cx="84" cy="28" r="11" fill="#FFF4CC" opacity="0.9" />
-      <rect x="0" y="72" width="120" height="48" fill="#2E86AB" opacity="0.6" />
-      <path d="M0 76 Q15 70 30 76 Q45 82 60 76 Q75 70 90 76 Q105 82 120 76 L120 120 H0 Z"
-            fill="#1A6B8A" opacity="0.7" />
-      <path d="M0 85 Q20 79 40 85 Q60 91 80 85 Q100 79 120 85 L120 120 H0 Z"
-            fill="#0D4F6B" opacity="0.5" />
-    </svg>
-  );
-}
-
 function SealedThumb({ days }: { days: number }) {
   return (
     <div className="sealed-thumb">
@@ -86,31 +44,27 @@ function SealedThumb({ days }: { days: number }) {
   );
 }
 
-function AlbumThumbnail({ album }: { album: Album }) {
-  if (album.status === 'sealed') {
-    return <SealedThumb days={album.daysLeft!} />;
-  }
-  if (album.thumbColor === 'amber') return <AmberThumb />;
-  if (album.thumbColor === 'ocean') return <OceanThumb />;
-  return <div className="sealed-thumb" />;
-}
-
 function AlbumCard({ album }: { album: Album }) {
   return (
     <div className="album-card">
       <div className="album-tape" />
       <div className="album-thumbnail">
-        <AlbumThumbnail album={album} />
+        {album.status === 'sealed'
+          ? <SealedThumb days={album.days_left ?? 0} />
+          : <AmberThumb />
+        }
       </div>
       <div className="album-info">
         <p className="album-name">{album.title}</p>
-        <p className="album-date">{album.date}</p>
+        <p className="album-date">
+          {new Date(album.reveal_date).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })}
+        </p>
         <div className="album-badges">
-          <span className="badge-exp">{album.exp} EXP</span>
-          <span className="badge-members">{album.members}名</span>
+          <span className="badge-exp">{album.photo_count} / {album.max_exposures} EXP</span>
+          <span className="badge-members">{album.member_count}名</span>
         </div>
         {album.status === 'sealed' ? (
-          <p className="album-status-pending">あと {album.daysLeft} 日でひらく</p>
+          <p className="album-status-pending">あと {album.days_left} 日でひらく</p>
         ) : (
           <p className="album-status-opened">ひらき済・タップして見る</p>
         )}
@@ -119,31 +73,147 @@ function AlbumCard({ album }: { album: Album }) {
   );
 }
 
-export default function AlbumsPage() {
-  const [filter, setFilter] = useState<FilterTab>('all');
+function CreateAlbumModal({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: (album: Album) => void;
+}) {
+  const [title, setTitle] = useState('');
+  const [revealDate, setRevealDate] = useState('');
+  const [maxExp, setMaxExp] = useState(27);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const filtered = ALBUMS.filter((a) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      const album = await api.createAlbum({
+        title,
+        reveal_date: revealDate,
+        max_exposures: maxExp,
+      });
+      onCreated(album);
+      onClose();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-sheet" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-handle" />
+        <p className="modal-title">新しいフィルムを装填</p>
+
+        {error && (
+          <p style={{ color: 'var(--red)', fontSize: 13, textAlign: 'center', marginTop: -8 }}>
+            {error}
+          </p>
+        )}
+
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div className="field">
+            <div className="field-header">
+              <label className="field-label" htmlFor="c-title">アルバム名</label>
+            </div>
+            <input
+              id="c-title"
+              type="text"
+              className="field-input"
+              placeholder="夏フェス 2026"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+              maxLength={100}
+            />
+          </div>
+
+          <div className="field">
+            <div className="field-header">
+              <label className="field-label" htmlFor="c-date">現像日（ひらく日）</label>
+            </div>
+            <input
+              id="c-date"
+              type="date"
+              className="field-input"
+              value={revealDate}
+              onChange={(e) => setRevealDate(e.target.value)}
+              required
+              min={new Date().toISOString().split('T')[0]}
+            />
+          </div>
+
+          <div className="field">
+            <div className="field-header">
+              <label className="field-label" htmlFor="c-exp">枚数（EXP）</label>
+              <span className="field-hint">{maxExp} 枚</span>
+            </div>
+            <input
+              id="c-exp"
+              type="range"
+              min={1}
+              max={99}
+              value={maxExp}
+              onChange={(e) => setMaxExp(Number(e.target.value))}
+              style={{ width: '100%', accentColor: 'var(--dark)', margin: '12px 0 0' }}
+            />
+          </div>
+
+          <button type="submit" className="btn-primary" disabled={submitting}>
+            {submitting ? '装 填 中 …' : 'フ ィ ル ム を 装 填 す る'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+export default function AlbumsPage() {
+  const [albums, setAlbums] = useState<Album[]>([]);
+  const [filter, setFilter] = useState<FilterTab>('all');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!token.get()) {
+      router.replace('/signin');
+      return;
+    }
+    api.listAlbums()
+      .then(setAlbums)
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, [router]);
+
+  const filtered = albums.filter((a) => {
     if (filter === 'sealed') return a.status === 'sealed';
     if (filter === 'opened') return a.status === 'opened';
     return true;
   });
 
-  const sealedCount = ALBUMS.filter((a) => a.status === 'sealed').length;
-  const total = ALBUMS.length;
+  const sealedCount = albums.filter((a) => a.status === 'sealed').length;
 
   return (
     <div className="albums-page">
       {/* Header */}
       <div className="albums-header">
-        <span className="albums-username">林　健太</span>
-        <span className="albums-title">現像所</span>
-        <button className="albums-add-btn" aria-label="アルバムを追加">＋</button>
+        <span className="albums-username">現像所</span>
+        <span className="albums-title">変ルンです</span>
+        <button className="albums-add-btn" aria-label="アルバムを追加" onClick={() => setShowCreate(true)}>＋</button>
       </div>
 
       {/* Summary */}
       <div className="albums-summary">
         <p className="albums-count">
-          {total}<span>巻 のフィルム</span>
+          {albums.length}<span>巻 のフィルム</span>
         </p>
         <p className="albums-pending">うち {sealedCount} 巻がおたのしみ中</p>
       </div>
@@ -165,17 +235,40 @@ export default function AlbumsPage() {
         ))}
       </div>
 
-      {/* Album list */}
+      {/* Content */}
       <div className="albums-list">
+        {loading && (
+          <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0' }}>
+            現像中…
+          </p>
+        )}
+        {error && (
+          <p style={{ textAlign: 'center', color: 'var(--red)', padding: '40px 0' }}>
+            {error}
+          </p>
+        )}
+        {!loading && !error && filtered.length === 0 && (
+          <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0' }}>
+            フィルムがありません
+          </p>
+        )}
         {filtered.map((album) => (
           <AlbumCard key={album.id} album={album} />
         ))}
       </div>
 
       {/* FAB */}
-      <button className="fab" aria-label="新しいアルバムを作成">
+      <button className="fab" aria-label="新しいアルバムを作成" onClick={() => setShowCreate(true)}>
         <span className="fab-icon">＋</span>
       </button>
+
+      {/* Create modal */}
+      {showCreate && (
+        <CreateAlbumModal
+          onClose={() => setShowCreate(false)}
+          onCreated={(album) => setAlbums((prev) => [...prev, album])}
+        />
+      )}
     </div>
   );
 }

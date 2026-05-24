@@ -3,17 +3,33 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { api } from '@/lib/api';
+import { token } from '@/lib/token';
 
 export default function SignInPage() {
   const [tab, setTab] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [remember, setRemember] = useState(true);
+  const [displayName, setDisplayName] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    router.push('/');
+    setError(null);
+    setLoading(true);
+    try {
+      const res = tab === 'login'
+        ? await api.login(email, password)
+        : await api.register(email, password, displayName);
+      token.set(res.token);
+      router.push('/albums');
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -36,20 +52,44 @@ export default function SignInPage() {
       <div className="tabs">
         <button
           className={`tab-btn${tab === 'login' ? ' active' : ''}`}
-          onClick={() => setTab('login')}
+          onClick={() => { setTab('login'); setError(null); }}
         >
           ログイン
         </button>
         <button
           className={`tab-btn${tab === 'register' ? ' active' : ''}`}
-          onClick={() => setTab('register')}
+          onClick={() => { setTab('register'); setError(null); }}
         >
           新規登録
         </button>
       </div>
 
+      {/* Error */}
+      {error && (
+        <div style={{ color: 'var(--red)', fontSize: 13, marginBottom: 16 }}>
+          {error}
+        </div>
+      )}
+
       {/* Form */}
       <form onSubmit={handleSubmit}>
+        {tab === 'register' && (
+          <div className="field">
+            <div className="field-header">
+              <label className="field-label" htmlFor="display_name">表示名</label>
+            </div>
+            <input
+              id="display_name"
+              type="text"
+              className="field-input"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder="林 健太"
+              required
+            />
+          </div>
+        )}
+
         <div className="field">
           <div className="field-header">
             <label className="field-label" htmlFor="email">メールアドレス</label>
@@ -63,6 +103,7 @@ export default function SignInPage() {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="example@email.com"
             autoComplete="email"
+            required
           />
         </div>
 
@@ -79,27 +120,15 @@ export default function SignInPage() {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
             autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
+            required
+            minLength={8}
           />
         </div>
 
-        <label className="checkbox-row">
-          <input
-            type="checkbox"
-            checked={remember}
-            onChange={(e) => setRemember(e.target.checked)}
-          />
-          <span className="checkbox-label">このデバイスを記憶する</span>
-        </label>
-
-        <button type="submit" className="btn-primary">
-          受 付 す る
+        <button type="submit" className="btn-primary" disabled={loading}>
+          {loading ? '処 理 中 …' : '受 付 す る'}
         </button>
       </form>
-
-      <div className="divider">または</div>
-
-      <button type="button" className="btn-outline">A p p l e　で 続 け る</button>
-      <button type="button" className="btn-outline">G o o g l e　で 続 け る</button>
     </div>
   );
 }

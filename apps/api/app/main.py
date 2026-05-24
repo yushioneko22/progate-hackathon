@@ -2,11 +2,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.routers import todos
+from app.routers import albums, auth, todos
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="Todo API", version="0.0.0")
+    app = FastAPI(title="変ルンです API", version="0.1.0")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -20,6 +20,8 @@ def create_app() -> FastAPI:
         return {"ok": True}
 
     app.include_router(todos.router)
+    app.include_router(auth.router)
+    app.include_router(albums.router)
     return app
 
 
