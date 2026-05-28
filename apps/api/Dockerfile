@@ -23,5 +23,7 @@ COPY apps/api/app ./app
 COPY apps/api/alembic ./alembic
 COPY apps/api/alembic.ini ./alembic.ini
 COPY apps/api/pyproject.toml ./pyproject.toml
+COPY apps/api/docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x ./docker-entrypoint.sh
 EXPOSE 8787
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8787"]
+CMD ["./docker-entrypoint.sh"]

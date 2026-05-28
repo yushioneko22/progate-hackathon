@@ -15,8 +15,8 @@ services:
     region: singapore
     dockerfilePath: apps/api/Dockerfile
     dockerContext: .
-    # 起動のたびにマイグレーションを適用してから $PORT で待ち受ける。
-    dockerCommand: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    # 起動コマンドは Dockerfile の CMD (docker-entrypoint.sh) に任せる。
+    # 同スクリプトが alembic upgrade head 実行後、$PORT で uvicorn を起動する。
     healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
