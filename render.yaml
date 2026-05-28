@@ -26,6 +26,14 @@ services:
         fromDatabase:
           name: kawarun-db
           property: connectionString
+      # 写真ストレージ (Supabase)。値はダッシュボードで設定する(秘密情報はコミットしない)。
+      - key: SUPABASE_URL
+        sync: false
+      # service_role(secret) キーを設定する(anon ではアップロード不可)
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_BUCKET
+        value: photos
       # デプロイした Web フロントから叩く場合のみ、その URL を JSON 配列で設定する。
       # 例: ["https://kawarun-web.onrender.com"]
       # React Native アプリは CORS の対象外なので未設定でも動作する。

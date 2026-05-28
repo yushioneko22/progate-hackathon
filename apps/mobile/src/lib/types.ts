@@ -30,3 +30,11 @@ export type TokenResponse = {
   token: string;
   user: User;
 };
+
+export type Photo = {
+  id: string;
+  album_id: string;
+  url: string;
+  taken_at: string | null;
+  created_at: string;
+};

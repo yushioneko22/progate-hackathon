@@ -3,6 +3,7 @@ import {
   View, Text, TouchableOpacity, StyleSheet, SafeAreaView,
   ScrollView, Modal, TextInput, ActivityIndicator, Alert,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { api } from '../lib/api';
 import { token } from '../lib/token';
 import type { Album } from '../lib/types';
@@ -16,10 +17,10 @@ const C = {
 
 const EXP_OPTIONS = [8, 12, 18, 24, 27, 36];
 
-function AlbumCard({ album }: { album: Album }) {
+function AlbumCard({ album, onPress }: { album: Album; onPress: () => void }) {
   const isSealed = album.status === 'sealed';
   return (
-    <View style={s.card}>
+    <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={0.85}>
       <View style={s.cardTop}>
         <View style={[s.statusBadge, isSealed ? s.statusSealed : s.statusOpened]}>
           <Text style={[s.statusText, { color: isSealed ? C.red : C.green }]}>
@@ -48,7 +49,7 @@ function AlbumCard({ album }: { album: Album }) {
         <Text style={s.cardMeta}>{album.photo_count} / {album.max_exposures} EXP</Text>
         <Text style={s.cardDate}>{album.reveal_date.slice(0, 10)}</Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -159,6 +160,7 @@ export function AlbumsScreen({ onNavigate }: { onNavigate: (s: Screen) => void }
   const [albums, setAlbums] = useState<Album[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -176,6 +178,52 @@ export function AlbumsScreen({ onNavigate }: { onNavigate: (s: Screen) => void }
   function handleSignOut() {
     token.remove();
     onNavigate('landing');
+  }
+
+  async function pickAndUpload(album: Album, source: 'camera' | 'library') {
+    const perm =
+      source === 'camera'
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert(
+        '権限が必要です',
+        source === 'camera'
+          ? 'カメラへのアクセスを許可してください'
+          : '写真ライブラリへのアクセスを許可してください',
+      );
+      return;
+    }
+    const result =
+      source === 'camera'
+        ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.6 })
+        : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.6 });
+    if (result.canceled) return;
+
+    setUploading(true);
+    try {
+      await api.uploadPhoto(album.id, result.assets[0]);
+      setAlbums(prev =>
+        prev.map(a => (a.id === album.id ? { ...a, photo_count: a.photo_count + 1 } : a)),
+      );
+      Alert.alert('保存しました', '写真をアルバムに追加しました');
+    } catch (e) {
+      Alert.alert('エラー', e instanceof Error ? e.message : 'アップロードに失敗しました');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function handleAddPhoto(album: Album) {
+    if (album.photo_count >= album.max_exposures) {
+      Alert.alert('フィルムを使い切りました', `このアルバムは ${album.max_exposures} 枚までです`);
+      return;
+    }
+    Alert.alert('写真を追加', album.title, [
+      { text: 'カメラで撮影', onPress: () => pickAndUpload(album, 'camera') },
+      { text: 'ライブラリから選択', onPress: () => pickAndUpload(album, 'library') },
+      { text: 'キャンセル', style: 'cancel' },
+    ]);
   }
 
   return (
@@ -202,7 +250,9 @@ export function AlbumsScreen({ onNavigate }: { onNavigate: (s: Screen) => void }
         </View>
       ) : (
         <ScrollView contentContainerStyle={s.list} showsVerticalScrollIndicator={false}>
-          {albums.map(a => <AlbumCard key={a.id} album={a} />)}
+          {albums.map(a => (
+            <AlbumCard key={a.id} album={a} onPress={() => handleAddPhoto(a)} />
+          ))}
           <View style={{ height: 100 }} />
         </ScrollView>
       )}
@@ -216,6 +266,13 @@ export function AlbumsScreen({ onNavigate }: { onNavigate: (s: Screen) => void }
         onClose={() => setShowCreate(false)}
         onCreated={a => setAlbums(prev => [a, ...prev])}
       />
+
+      {uploading && (
+        <View style={s.uploadOverlay}>
+          <ActivityIndicator size="large" color="#F5EDD8" />
+          <Text style={s.uploadText}>アップロード中...</Text>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -292,4 +349,12 @@ const s = StyleSheet.create({
   btn: { backgroundColor: C.dark, paddingVertical: 16, alignItems: 'center' },
   btnDisabled: { opacity: 0.6 },
   btnText: { color: '#F5EDD8', fontSize: 15, fontWeight: '500', letterSpacing: 6 },
+
+  uploadOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(28,18,8,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  uploadText: { color: '#F5EDD8', fontSize: 14, marginTop: 12, letterSpacing: 2 },
 });

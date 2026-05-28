@@ -25,5 +25,11 @@ class Settings(BaseSettings):
     ]
     api_port: int = 8787
 
+    # Supabase Storage (写真の実体を保存するオブジェクトストレージ)
+    # supabase_key は service_role(secret) キーを使う(anon ではアップロード不可)
+    supabase_url: str = ""
+    supabase_key: str = ""
+    supabase_bucket: str = "photos"
+
 
 settings = Settings()
