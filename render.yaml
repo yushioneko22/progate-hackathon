@@ -4,6 +4,9 @@
 databases:
   - name: kawarun-db
     plan: free
+    # web サービスと同一リージョンにすること。Render の内部接続文字列
+    # (connectionString) は同一リージョン内でしか名前解決できないため。
+    region: singapore
     databaseName: kawarun
     user: kawarun
 
