@@ -1,9 +1,15 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, SafeAreaView,
   ScrollView, Modal, TextInput, ActivityIndicator, Alert,
+  KeyboardAvoidingView, Platform, Animated, PanResponder, Dimensions,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+
+const SCREEN_H = Dimensions.get('window').height;
+const SNAP_DEFAULT = 0;
+const SNAP_EXPANDED = -SCREEN_H * 0.35;
+const CLOSE_THRESHOLD = 100;
 import { api } from '../lib/api';
 import { token } from '../lib/token';
 import type { Album } from '../lib/types';
@@ -66,9 +72,45 @@ function CreateModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  function reset() {
-    setTitle(''); setDate(''); setExpIdx(2); setError('');
-  }
+  // キーボードによる移動とは別に、ハンドルドラッグ用のオフセット
+  const dragY = useRef(new Animated.Value(0)).current;
+  const lastDragY = useRef(0);
+
+  useEffect(() => {
+    if (!visible) {
+      dragY.setValue(0);
+      lastDragY.current = 0;
+    }
+  }, [visible, dragY]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 8,
+      onPanResponderGrant: () => {
+        dragY.stopAnimation(v => { lastDragY.current = v; });
+      },
+      onPanResponderMove: (_, g) => {
+        dragY.setValue(lastDragY.current + g.dy);
+      },
+      onPanResponderRelease: (_, g) => {
+        dragY.stopAnimation(cur => {
+          lastDragY.current = cur;
+          if (cur > CLOSE_THRESHOLD || g.vy > 0.7) {
+            // 下にフリック → 閉じる
+            Animated.timing(dragY, { toValue: SCREEN_H, duration: 200, useNativeDriver: true })
+              .start(() => { dragY.setValue(0); lastDragY.current = 0; onClose(); });
+          } else {
+            // それ以外はドラッグした位置でキープ（上下に止まる）
+            Animated.spring(dragY, { toValue: cur < 0 ? cur : 0, useNativeDriver: true, bounciness: 4 }).start();
+            lastDragY.current = cur < 0 ? cur : 0;
+          }
+        });
+      },
+    })
+  ).current;
+
+  function reset() { setTitle(''); setDate(''); setExpIdx(2); setError(''); }
 
   async function handleCreate() {
     if (!title.trim()) { setError('タイトルを入力してください'); return; }
@@ -92,71 +134,83 @@ function CreateModal({
   }
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={s.modalOverlay}>
         <TouchableOpacity style={s.modalBackdrop} onPress={onClose} activeOpacity={1} />
-        <View style={s.modalSheet}>
-          <View style={s.modalHandle} />
-          <Text style={s.modalTitle}>新しいアルバムを作成</Text>
-
-          <View style={s.field}>
-            <Text style={s.label}>タイトル</Text>
-            <TextInput
-              style={s.input}
-              value={title}
-              onChangeText={setTitle}
-              placeholder="夏合宿 2025"
-              placeholderTextColor={C.muted}
-            />
-          </View>
-
-          <View style={s.field}>
-            <Text style={s.label}>現像日 (YYYY-MM-DD)</Text>
-            <TextInput
-              style={s.input}
-              value={date}
-              onChangeText={setDate}
-              placeholder="2025-08-31"
-              placeholderTextColor={C.muted}
-              keyboardType="numbers-and-punctuation"
-            />
-          </View>
-
-          <View style={s.field}>
-            <Text style={s.label}>枚数制限 — {EXP_OPTIONS[expIdx]} EXP</Text>
-            <View style={s.expOptions}>
-              {EXP_OPTIONS.map((v, i) => (
-                <TouchableOpacity
-                  key={v}
-                  style={[s.expChip, i === expIdx && s.expChipActive]}
-                  onPress={() => setExpIdx(i)}
-                >
-                  <Text style={[s.expChipText, i === expIdx && s.expChipTextActive]}>{v}</Text>
-                </TouchableOpacity>
-              ))}
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <Animated.View style={[s.modalSheet, { transform: [{ translateY: dragY }] }]}>
+            {/* ドラッグハンドル：ここを上下にスワイプで動かせる */}
+            <View {...panResponder.panHandlers} style={s.handleArea}>
+              <View style={s.modalHandle} />
             </View>
-          </View>
 
-          {error !== '' && <Text style={s.error}>{error}</Text>}
+            <ScrollView
+              contentContainerStyle={s.modalSheetContent}
+              keyboardShouldPersistTaps="handled"
+              bounces={false}
+            >
+              <Text style={s.modalTitle}>新しいアルバムを作成</Text>
 
-          <TouchableOpacity
-            style={[s.btn, loading && s.btnDisabled]}
-            onPress={handleCreate}
-            disabled={loading}
-            activeOpacity={0.8}
-          >
-            {loading
-              ? <ActivityIndicator color="#F5EDD8" />
-              : <Text style={s.btnText}>作　成</Text>
-            }
-          </TouchableOpacity>
-        </View>
+              <View style={s.field}>
+                <Text style={s.label}>タイトル</Text>
+                <TextInput
+                  style={s.input}
+                  value={title}
+                  onChangeText={setTitle}
+                  placeholder="夏合宿 2025"
+                  placeholderTextColor={C.muted}
+                />
+              </View>
+
+              <View style={s.field}>
+                <Text style={s.label}>現像日 (YYYY-MM-DD)</Text>
+                <TextInput
+                  style={s.input}
+                  value={date}
+                  onChangeText={setDate}
+                  placeholder="2025-08-31"
+                  placeholderTextColor={C.muted}
+                  keyboardType="numbers-and-punctuation"
+                />
+              </View>
+
+              <View style={s.field}>
+                <Text style={s.label}>枚数制限 — {EXP_OPTIONS[expIdx]} EXP</Text>
+                <View style={s.expOptions}>
+                  {EXP_OPTIONS.map((v, i) => (
+                    <TouchableOpacity
+                      key={v}
+                      style={[s.expChip, i === expIdx && s.expChipActive]}
+                      onPress={() => setExpIdx(i)}
+                    >
+                      <Text style={[s.expChipText, i === expIdx && s.expChipTextActive]}>{v}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {error !== '' && <Text style={s.error}>{error}</Text>}
+
+              <TouchableOpacity
+                style={[s.btn, loading && s.btnDisabled]}
+                onPress={handleCreate}
+                disabled={loading}
+                activeOpacity={0.8}
+              >
+                {loading
+                  ? <ActivityIndicator color="#F5EDD8" />
+                  : <Text style={s.btnText}>作　成</Text>
+                }
+              </TouchableOpacity>
+            </ScrollView>
+          </Animated.View>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );
 }
 
-export function AlbumsScreen({ onNavigate }: { onNavigate: (s: Screen) => void }) {
+export function AlbumsScreen({ onNavigate, onNavigateToAlbum }: { onNavigate: (s: Screen) => void; onNavigateToAlbum: (a: Album) => void }) {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -250,9 +304,7 @@ export function AlbumsScreen({ onNavigate }: { onNavigate: (s: Screen) => void }
         </View>
       ) : (
         <ScrollView contentContainerStyle={s.list} showsVerticalScrollIndicator={false}>
-          {albums.map(a => (
-            <AlbumCard key={a.id} album={a} onPress={() => handleAddPhoto(a)} />
-          ))}
+          {albums.map(a => <AlbumCard key={a.id} album={a} onPress={() => onNavigateToAlbum(a)} />)}
           <View style={{ height: 100 }} />
         </ScrollView>
       )}
@@ -327,8 +379,13 @@ const s = StyleSheet.create({
   // Modal
   modalOverlay: { flex: 1, justifyContent: 'flex-end' },
   modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(28,18,8,0.5)' },
-  modalSheet: { backgroundColor: C.card, borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 24, paddingBottom: 40 },
-  modalHandle: { width: 40, height: 4, backgroundColor: C.border, borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
+  modalSheet: {
+    backgroundColor: C.card,
+    borderTopLeftRadius: 16, borderTopRightRadius: 16,
+  },
+  handleArea: { paddingTop: 12, paddingBottom: 8, alignItems: 'center' },
+  modalHandle: { width: 40, height: 4, backgroundColor: C.border, borderRadius: 2 },
+  modalSheetContent: { padding: 24, paddingBottom: 40 },
   modalTitle: { fontSize: 18, fontWeight: '900', color: C.dark, marginBottom: 20 },
 
   field: { marginBottom: 16 },
