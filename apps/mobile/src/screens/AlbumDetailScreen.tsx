@@ -114,7 +114,7 @@ function OpenedView({ album }: { album: Album }) {
     return () => clearTimeout(t);
   }, [fadeAnim, slideAnim]);
 
-  const photos = MOCK_PHOTO_COLORS.slice(0, Math.min(album.photo_count || 6, 9));
+  const photos = MOCK_PHOTO_COLORS.slice(0, Math.min(Math.max(album.photo_count, 6), 9));
 
   return (
     <ScrollView contentContainerStyle={s.openedContainer}>
