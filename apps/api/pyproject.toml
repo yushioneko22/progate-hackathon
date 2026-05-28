@@ -11,6 +11,8 @@ dependencies = [
     "pydantic>=2.10.0",
     "pydantic-settings>=2.7.0",
     "alembic>=1.14.0",
+    "httpx>=0.28.1",
+    "python-multipart>=0.0.29",
 ]
 
 [dependency-groups]

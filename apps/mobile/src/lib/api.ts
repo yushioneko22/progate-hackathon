@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import { token } from './token';
-import type { Album, Todo, TokenResponse } from './types';
+import type { Album, Photo, Todo, TokenResponse } from './types';
 
 function resolveApiUrl(): string {
   const fromEnv = process.env.EXPO_PUBLIC_API_URL;
@@ -12,8 +12,10 @@ function resolveApiUrl(): string {
 const API_URL = resolveApiUrl();
 
 async function request<T>(path: string, init?: RequestInit, auth = false): Promise<T> {
+  // FormData の場合は content-type を指定しない(fetch が boundary 付きで自動設定する)
+  const isForm = typeof FormData !== 'undefined' && init?.body instanceof FormData;
   const headers: Record<string, string> = {
-    'content-type': 'application/json',
+    ...(isForm ? {} : { 'content-type': 'application/json' }),
     ...(init?.headers as Record<string, string> ?? {}),
   };
   if (auth) {
@@ -51,4 +53,19 @@ export const api = {
   listAlbums: () => request<Album[]>('/albums', undefined, true),
   createAlbum: (data: { title: string; reveal_date: string; max_exposures: number }) =>
     request<Album>('/albums', { method: 'POST', body: JSON.stringify(data) }, true),
+
+  listPhotos: (albumId: string) =>
+    request<Photo[]>(`/albums/${albumId}/photos`, undefined, true),
+  uploadPhoto: (
+    albumId: string,
+    asset: { uri: string; fileName?: string | null; mimeType?: string | null },
+  ) => {
+    const form = new FormData();
+    form.append('file', {
+      uri: asset.uri,
+      name: asset.fileName ?? `photo-${Date.now()}.jpg`,
+      type: asset.mimeType ?? 'image/jpeg',
+    } as unknown as Blob);
+    return request<Photo>(`/albums/${albumId}/photos`, { method: 'POST', body: form }, true);
+  },
 };
