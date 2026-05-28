@@ -16,10 +16,10 @@ const C = {
 
 const EXP_OPTIONS = [8, 12, 18, 24, 27, 36];
 
-function AlbumCard({ album }: { album: Album }) {
+function AlbumCard({ album, onPress }: { album: Album; onPress: () => void }) {
   const isSealed = album.status === 'sealed';
   return (
-    <View style={s.card}>
+    <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={0.85}>
       <View style={s.cardTop}>
         <View style={[s.statusBadge, isSealed ? s.statusSealed : s.statusOpened]}>
           <Text style={[s.statusText, { color: isSealed ? C.red : C.green }]}>
@@ -48,7 +48,7 @@ function AlbumCard({ album }: { album: Album }) {
         <Text style={s.cardMeta}>{album.photo_count} / {album.max_exposures} EXP</Text>
         <Text style={s.cardDate}>{album.reveal_date.slice(0, 10)}</Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -155,7 +155,7 @@ function CreateModal({
   );
 }
 
-export function AlbumsScreen({ onNavigate }: { onNavigate: (s: Screen) => void }) {
+export function AlbumsScreen({ onNavigate, onNavigateToAlbum }: { onNavigate: (s: Screen) => void; onNavigateToAlbum: (a: Album) => void }) {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -202,7 +202,7 @@ export function AlbumsScreen({ onNavigate }: { onNavigate: (s: Screen) => void }
         </View>
       ) : (
         <ScrollView contentContainerStyle={s.list} showsVerticalScrollIndicator={false}>
-          {albums.map(a => <AlbumCard key={a.id} album={a} />)}
+          {albums.map(a => <AlbumCard key={a.id} album={a} onPress={() => onNavigateToAlbum(a)} />)}
           <View style={{ height: 100 }} />
         </ScrollView>
       )}

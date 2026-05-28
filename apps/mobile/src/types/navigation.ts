@@ -1,1 +1,1 @@
-export type Screen = 'landing' | 'signin' | 'albums';
+export type Screen = 'landing' | 'signin' | 'albums' | 'album-detail';
