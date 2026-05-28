@@ -1,0 +1,30 @@
+# Render Blueprint — 変ルンです API (FastAPI) + PostgreSQL
+# Render ダッシュボードの "New +" → "Blueprint" でこのリポジトリを選ぶと、
+# 下記の web サービスとマネージド Postgres がまとめて作成されます。
+databases:
+  - name: kawarun-db
+    plan: free
+    databaseName: kawarun
+    user: kawarun
+
+services:
+  - type: web
+    name: kawarun-api
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: apps/api/Dockerfile
+    dockerContext: .
+    # 起動のたびにマイグレーションを適用してから $PORT で待ち受ける。
+    dockerCommand: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: kawarun-db
+          property: connectionString
+      # デプロイした Web フロントから叩く場合のみ、その URL を JSON 配列で設定する。
+      # 例: ["https://kawarun-web.onrender.com"]
+      # React Native アプリは CORS の対象外なので未設定でも動作する。
+      # - key: CORS_ORIGINS
+      #   sync: false
