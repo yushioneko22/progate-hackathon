@@ -1,10 +1,7 @@
 import { Platform } from 'react-native';
-import type { Todo } from './types';
+import { token } from './token';
+import type { Album, Todo, TokenResponse } from './types';
 
-// Resolve API base URL with platform-aware fallbacks:
-// - EXPO_PUBLIC_API_URL wins if set (best for physical devices on the LAN).
-// - Android emulator can't reach the host via "localhost"; it uses 10.0.2.2.
-// - iOS Simulator and Web can use localhost directly.
 function resolveApiUrl(): string {
   const fromEnv = process.env.EXPO_PUBLIC_API_URL;
   if (fromEnv) return fromEnv;
@@ -14,15 +11,20 @@ function resolveApiUrl(): string {
 
 const API_URL = resolveApiUrl();
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: {
-      'content-type': 'application/json',
-      ...(init?.headers ?? {}),
-    },
-  });
-  if (!res.ok) throw new Error(`API ${res.status}`);
+async function request<T>(path: string, init?: RequestInit, auth = false): Promise<T> {
+  const headers: Record<string, string> = {
+    'content-type': 'application/json',
+    ...(init?.headers as Record<string, string> ?? {}),
+  };
+  if (auth) {
+    const t = token.get();
+    if (t) headers['authorization'] = `Bearer ${t}`;
+  }
+  const res = await fetch(`${API_URL}${path}`, { ...init, headers });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error((body as { detail?: string }).detail ?? `API ${res.status}`);
+  }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
@@ -34,4 +36,19 @@ export const api = {
   update: (id: string, patch: { title?: string; completed?: boolean }) =>
     request<Todo>(`/todos/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   remove: (id: string) => request<void>(`/todos/${id}`, { method: 'DELETE' }),
+
+  register: (email: string, password: string, display_name: string) =>
+    request<TokenResponse>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ email, password, display_name }),
+    }),
+  login: (email: string, password: string) =>
+    request<TokenResponse>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    }),
+
+  listAlbums: () => request<Album[]>('/albums', undefined, true),
+  createAlbum: (data: { title: string; reveal_date: string; max_exposures: number }) =>
+    request<Album>('/albums', { method: 'POST', body: JSON.stringify(data) }, true),
 };
