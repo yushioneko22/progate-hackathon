@@ -6,7 +6,7 @@ databases:
     plan: free
     # web サービスと同一リージョンにすること。Render の内部接続文字列
     # (connectionString) は同一リージョン内でしか名前解決できないため。
-    region: singapore
+    region: oregon
     databaseName: kawarun
     user: kawarun
 
@@ -15,7 +15,7 @@ services:
     name: kawarun-api
     runtime: docker
     plan: free
-    region: singapore
+    region: oregon
     dockerfilePath: apps/api/Dockerfile
     dockerContext: .
     # 起動コマンドは Dockerfile の CMD (docker-entrypoint.sh) に任せる。
