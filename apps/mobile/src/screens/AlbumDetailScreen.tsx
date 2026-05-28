@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, SafeAreaView,
-  ScrollView, Animated, Dimensions,
+  ScrollView, Animated, Dimensions, Image, ActivityIndicator, Alert,
 } from 'react-native';
-import type { Album } from '../lib/types';
+import * as ImagePicker from 'expo-image-picker';
+import { api } from '../lib/api';
+import type { Album, Photo } from '../lib/types';
 
 const C = {
   bg: '#E8D5B0', card: '#F8F0DC', dark: '#1C1208',
@@ -13,34 +15,7 @@ const C = {
 
 const { width: SW } = Dimensions.get('window');
 
-// 仮写真の色パレット
-const MOCK_PHOTO_COLORS = [
-  ['#C8843A', '#3A2510'],
-  ['#2D5A3D', '#1A3A28'],
-  ['#B8291C', '#7A1A10'],
-  ['#8A6A3A', '#5A4020'],
-  ['#4A6A8A', '#2A4A6A'],
-  ['#6A4A8A', '#3A2A5A'],
-  ['#8A4A4A', '#5A2A2A'],
-  ['#4A8A6A', '#2A5A4A'],
-  ['#8A8A3A', '#5A5A1A'],
-];
-
-function MockPhoto({ colors, rotation }: { colors: string[]; rotation: number }) {
-  return (
-    <View style={[s.polaroid, { transform: [{ rotate: `${rotation}deg` }] }]}>
-      <View style={[s.photoArea, { backgroundColor: colors[0] }]}>
-        {/* 月 */}
-        <View style={[s.moonSmall, { backgroundColor: colors[1], opacity: 0.6 }]} />
-        {/* 人物シルエット */}
-        <View style={[s.figureSmall, { backgroundColor: colors[1] }]} />
-      </View>
-      <View style={s.polaroidCaption} />
-    </View>
-  );
-}
-
-function SealedView({ album }: { album: Album }) {
+function SealedView({ album, count }: { album: Album; count: number }) {
   const pulse = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -56,19 +31,16 @@ function SealedView({ album }: { album: Album }) {
 
   return (
     <View style={s.sealedContainer}>
-      {/* フィルム穴装飾 */}
       <View style={s.filmStrip}>
         {[...Array(6)].map((_, i) => <View key={i} style={s.filmDot} />)}
       </View>
 
       <View style={s.darkRoom}>
-        {/* 暗室ランプ */}
         <View style={s.lamp}>
           <View style={s.lampGlow} />
           <View style={s.lampBulb} />
         </View>
 
-        {/* カウントダウン */}
         <Animated.View style={[s.countdownBox, { transform: [{ scale: pulse }] }]}>
           <Text style={s.countdownLabel}>現 像 ま で</Text>
           <Text style={s.countdownNum}>{daysLeft}</Text>
@@ -80,12 +52,11 @@ function SealedView({ album }: { album: Album }) {
         </View>
 
         <Text style={s.sealedDesc}>
-          現像日 {album.reveal_date.slice(0, 10)} まで{'\n'}このアルバムは開封できません
+          現像日 {album.reveal_date.slice(0, 10)} まで{'\n'}写真は封印されています（今のうちに撮影できます）
         </Text>
 
-        {/* フィルム情報 */}
         <View style={s.filmInfo}>
-          <Text style={s.filmInfoText}>{album.photo_count} / {album.max_exposures} EXP</Text>
+          <Text style={s.filmInfoText}>{count} / {album.max_exposures} EXP</Text>
           <Text style={s.filmInfoText}>{album.member_count}人参加中</Text>
         </View>
       </View>
@@ -97,15 +68,18 @@ function SealedView({ album }: { album: Album }) {
   );
 }
 
-function OpenedView({ album }: { album: Album }) {
-  const [revealed, setRevealed] = useState(false);
+function OpenedView({
+  album, photos, loading,
+}: {
+  album: Album;
+  photos: Photo[];
+  loading: boolean;
+}) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(40)).current;
 
   useEffect(() => {
-    // 少し待ってから「現像完了」演出
     const t = setTimeout(() => {
-      setRevealed(true);
       Animated.parallel([
         Animated.timing(fadeAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
         Animated.timing(slideAnim, { toValue: 0, duration: 600, useNativeDriver: true }),
@@ -114,38 +88,101 @@ function OpenedView({ album }: { album: Album }) {
     return () => clearTimeout(t);
   }, [fadeAnim, slideAnim]);
 
-  const photos = MOCK_PHOTO_COLORS.slice(0, Math.min(Math.max(album.photo_count, 6), 9));
-
   return (
     <ScrollView contentContainerStyle={s.openedContainer}>
-      {/* 現像完了バナー */}
       <Animated.View style={[s.revealBanner, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
         <Text style={s.revealEmoji}>📸</Text>
         <Text style={s.revealTitle}>現 像 完 了 ！</Text>
         <Text style={s.revealDate}>{album.reveal_date.slice(0, 10)} に現像されました</Text>
       </Animated.View>
 
-      {/* 写真グリッド */}
-      <Animated.View style={[s.photoGrid, { opacity: fadeAnim }]}>
-        {photos.map((colors, i) => (
-          <MockPhoto
-            key={i}
-            colors={colors}
-            rotation={(i % 3 === 0 ? -2 : i % 3 === 1 ? 1 : -1) + (i % 2 === 0 ? 0.5 : -0.5)}
-          />
-        ))}
-        {photos.length === 0 && (
-          <View style={s.emptyPhotos}>
-            <Text style={s.emptyPhotosText}>写真がまだありません</Text>
-          </View>
-        )}
-      </Animated.View>
+      {loading ? (
+        <View style={s.loadingBox}>
+          <ActivityIndicator size="large" color={C.dark} />
+        </View>
+      ) : photos.length === 0 ? (
+        <View style={s.emptyPhotos}>
+          <Text style={s.emptyPhotosText}>写真がまだありません</Text>
+        </View>
+      ) : (
+        <Animated.View style={[s.photoGrid, { opacity: fadeAnim }]}>
+          {photos.map((p, i) => {
+            const rotation = (i % 3 === 0 ? -2 : i % 3 === 1 ? 1 : -1) + (i % 2 === 0 ? 0.5 : -0.5);
+            return (
+              <View key={p.id} style={[s.polaroid, { transform: [{ rotate: `${rotation}deg` }] }]}>
+                <View style={s.photoArea}>
+                  <Image source={{ uri: p.url }} style={s.photoImg} resizeMode="cover" />
+                </View>
+                <View style={s.polaroidCaption} />
+              </View>
+            );
+          })}
+        </Animated.View>
+      )}
     </ScrollView>
   );
 }
 
 export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () => void }) {
   const isSealed = album.status === 'sealed';
+  const [count, setCount] = useState(album.photo_count);
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [loadingPhotos, setLoadingPhotos] = useState(!isSealed);
+  const [uploading, setUploading] = useState(false);
+
+  useEffect(() => {
+    if (isSealed) return;
+    api
+      .listPhotos(album.id)
+      .then(setPhotos)
+      .catch(() => Alert.alert('エラー', '写真の読み込みに失敗しました'))
+      .finally(() => setLoadingPhotos(false));
+  }, [album.id, isSealed]);
+
+  async function pickAndUpload(source: 'camera' | 'library') {
+    const perm =
+      source === 'camera'
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert(
+        '権限が必要です',
+        source === 'camera'
+          ? 'カメラへのアクセスを許可してください'
+          : '写真ライブラリへのアクセスを許可してください',
+      );
+      return;
+    }
+    const result =
+      source === 'camera'
+        ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.6 })
+        : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.6 });
+    if (result.canceled) return;
+
+    setUploading(true);
+    try {
+      const photo = await api.uploadPhoto(album.id, result.assets[0]);
+      setCount(c => c + 1);
+      if (!isSealed) setPhotos(prev => [...prev, photo]);
+      Alert.alert('保存しました', '写真をアルバムに追加しました');
+    } catch (e) {
+      Alert.alert('エラー', e instanceof Error ? e.message : 'アップロードに失敗しました');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function handleAddPhoto() {
+    if (count >= album.max_exposures) {
+      Alert.alert('フィルムを使い切りました', `このアルバムは ${album.max_exposures} 枚までです`);
+      return;
+    }
+    Alert.alert('写真を追加', album.title, [
+      { text: 'カメラで撮影', onPress: () => pickAndUpload('camera') },
+      { text: 'ライブラリから選択', onPress: () => pickAndUpload('library') },
+      { text: 'キャンセル', style: 'cancel' },
+    ]);
+  }
 
   return (
     <SafeAreaView style={s.safe}>
@@ -161,7 +198,22 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
         </View>
       </View>
 
-      {isSealed ? <SealedView album={album} /> : <OpenedView album={album} />}
+      {isSealed
+        ? <SealedView album={album} count={count} />
+        : <OpenedView album={album} photos={photos} loading={loadingPhotos} />}
+
+      {count < album.max_exposures && (
+        <TouchableOpacity style={s.fab} onPress={handleAddPhoto} activeOpacity={0.85}>
+          <Text style={s.fabText}>＋</Text>
+        </TouchableOpacity>
+      )}
+
+      {uploading && (
+        <View style={s.uploadOverlay}>
+          <ActivityIndicator size="large" color="#F5EDD8" />
+          <Text style={s.uploadText}>アップロード中...</Text>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -222,11 +274,13 @@ const s = StyleSheet.create({
   filmInfoText: { color: 'rgba(232,213,176,0.4)', fontSize: 12, letterSpacing: 1 },
 
   // Opened
-  openedContainer: { padding: 20, gap: 24, paddingBottom: 48 },
+  openedContainer: { padding: 20, gap: 24, paddingBottom: 96 },
   revealBanner: { alignItems: 'center', gap: 8, paddingVertical: 16 },
   revealEmoji: { fontSize: 48 },
   revealTitle: { fontSize: 28, fontWeight: '900', color: C.dark, letterSpacing: 6 },
   revealDate: { fontSize: 12, color: C.muted },
+
+  loadingBox: { paddingVertical: 48, alignItems: 'center' },
 
   photoGrid: {
     flexDirection: 'row', flexWrap: 'wrap',
@@ -242,19 +296,28 @@ const s = StyleSheet.create({
   photoArea: {
     width: '100%', aspectRatio: 1,
     borderRadius: 2, overflow: 'hidden',
-    alignItems: 'center', justifyContent: 'flex-end',
-    position: 'relative',
+    backgroundColor: C.dark,
   },
-  moonSmall: {
-    position: 'absolute', top: 12, alignSelf: 'center',
-    width: 30, height: 30, borderRadius: 15,
-  },
-  figureSmall: {
-    width: 36, height: 40, borderTopLeftRadius: 14,
-    borderTopRightRadius: 14, marginBottom: 0,
-  },
+  photoImg: { width: '100%', height: '100%' },
   polaroidCaption: { height: 8 },
 
   emptyPhotos: { padding: 32, alignItems: 'center' },
   emptyPhotosText: { color: C.muted, fontSize: 14 },
+
+  // 撮影 FAB / アップロード中
+  fab: {
+    position: 'absolute', bottom: 32, right: 24,
+    width: 60, height: 60, borderRadius: 30,
+    backgroundColor: C.dark, alignItems: 'center', justifyContent: 'center',
+    shadowColor: C.dark, shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3, shadowRadius: 8, elevation: 8,
+  },
+  fabText: { color: '#F5EDD8', fontSize: 28, lineHeight: 32, fontWeight: '300' },
+
+  uploadOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(28,18,8,0.6)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  uploadText: { color: '#F5EDD8', fontSize: 14, marginTop: 12, letterSpacing: 2 },
 });

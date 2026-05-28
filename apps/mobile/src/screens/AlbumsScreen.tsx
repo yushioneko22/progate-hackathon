@@ -4,11 +4,8 @@ import {
   ScrollView, Modal, TextInput, ActivityIndicator, Alert,
   KeyboardAvoidingView, Platform, Animated, PanResponder, Dimensions,
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
 
 const SCREEN_H = Dimensions.get('window').height;
-const SNAP_DEFAULT = 0;
-const SNAP_EXPANDED = -SCREEN_H * 0.35;
 const CLOSE_THRESHOLD = 100;
 import { api } from '../lib/api';
 import { token } from '../lib/token';
@@ -214,7 +211,6 @@ export function AlbumsScreen({ onNavigate, onNavigateToAlbum }: { onNavigate: (s
   const [albums, setAlbums] = useState<Album[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
-  const [uploading, setUploading] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -232,52 +228,6 @@ export function AlbumsScreen({ onNavigate, onNavigateToAlbum }: { onNavigate: (s
   function handleSignOut() {
     token.remove();
     onNavigate('landing');
-  }
-
-  async function pickAndUpload(album: Album, source: 'camera' | 'library') {
-    const perm =
-      source === 'camera'
-        ? await ImagePicker.requestCameraPermissionsAsync()
-        : await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert(
-        '権限が必要です',
-        source === 'camera'
-          ? 'カメラへのアクセスを許可してください'
-          : '写真ライブラリへのアクセスを許可してください',
-      );
-      return;
-    }
-    const result =
-      source === 'camera'
-        ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.6 })
-        : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.6 });
-    if (result.canceled) return;
-
-    setUploading(true);
-    try {
-      await api.uploadPhoto(album.id, result.assets[0]);
-      setAlbums(prev =>
-        prev.map(a => (a.id === album.id ? { ...a, photo_count: a.photo_count + 1 } : a)),
-      );
-      Alert.alert('保存しました', '写真をアルバムに追加しました');
-    } catch (e) {
-      Alert.alert('エラー', e instanceof Error ? e.message : 'アップロードに失敗しました');
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  function handleAddPhoto(album: Album) {
-    if (album.photo_count >= album.max_exposures) {
-      Alert.alert('フィルムを使い切りました', `このアルバムは ${album.max_exposures} 枚までです`);
-      return;
-    }
-    Alert.alert('写真を追加', album.title, [
-      { text: 'カメラで撮影', onPress: () => pickAndUpload(album, 'camera') },
-      { text: 'ライブラリから選択', onPress: () => pickAndUpload(album, 'library') },
-      { text: 'キャンセル', style: 'cancel' },
-    ]);
   }
 
   return (
@@ -318,13 +268,6 @@ export function AlbumsScreen({ onNavigate, onNavigateToAlbum }: { onNavigate: (s
         onClose={() => setShowCreate(false)}
         onCreated={a => setAlbums(prev => [a, ...prev])}
       />
-
-      {uploading && (
-        <View style={s.uploadOverlay}>
-          <ActivityIndicator size="large" color="#F5EDD8" />
-          <Text style={s.uploadText}>アップロード中...</Text>
-        </View>
-      )}
     </SafeAreaView>
   );
 }
@@ -406,12 +349,4 @@ const s = StyleSheet.create({
   btn: { backgroundColor: C.dark, paddingVertical: 16, alignItems: 'center' },
   btnDisabled: { opacity: 0.6 },
   btnText: { color: '#F5EDD8', fontSize: 15, fontWeight: '500', letterSpacing: 6 },
-
-  uploadOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(28,18,8,0.6)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  uploadText: { color: '#F5EDD8', fontSize: 14, marginTop: 12, letterSpacing: 2 },
 });
