@@ -1,11 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   SafeAreaView, ScrollView, ActivityIndicator,
 } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
 import { api } from '../lib/api';
 import { token } from '../lib/token';
 import type { Screen } from '../types/navigation';
+
+// OAuth リダイレクト後にブラウザセッションを確実に閉じる(必須)。
+WebBrowser.maybeCompleteAuthSession();
 
 const C = {
   bg: '#E8D5B0', card: '#F8F0DC', dark: '#1C1208',
@@ -21,6 +26,32 @@ export function SignInScreen({ onNavigate }: { onNavigate: (s: Screen) => void }
   const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
+    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+  });
+
+  // Google 認証が成功したら id_token をバックエンドへ送り、自前の JWT を受け取る。
+  useEffect(() => {
+    if (response?.type !== 'success') return;
+    const idToken = response.params.id_token;
+    if (!idToken) {
+      setError('Google ログインに失敗しました');
+      return;
+    }
+    setError('');
+    setLoading(true);
+    api
+      .googleLogin(idToken)
+      .then((res) => {
+        token.set(res.token);
+        onNavigate('albums');
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : 'エラーが発生しました'))
+      .finally(() => setLoading(false));
+  }, [response, onNavigate]);
 
   async function handleSubmit() {
     setError('');
@@ -117,6 +148,22 @@ export function SignInScreen({ onNavigate }: { onNavigate: (s: Screen) => void }
               : <Text style={s.btnText}>{tab === 'login' ? 'ログ イ ン' : '登　録'}</Text>
             }
           </TouchableOpacity>
+
+          <View style={s.divider}>
+            <View style={s.dividerLine} />
+            <Text style={s.dividerText}>または</Text>
+            <View style={s.dividerLine} />
+          </View>
+
+          <TouchableOpacity
+            style={[s.googleBtn, (!request || loading) && s.btnDisabled]}
+            onPress={() => { setError(''); void promptAsync(); }}
+            disabled={!request || loading}
+            activeOpacity={0.8}
+          >
+            <Text style={s.googleG}>G</Text>
+            <Text style={s.googleText}>Google でログイン</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -152,4 +199,15 @@ const s = StyleSheet.create({
   btn: { backgroundColor: C.dark, paddingVertical: 18, alignItems: 'center', marginTop: 8 },
   btnDisabled: { opacity: 0.6 },
   btnText: { color: '#F5EDD8', fontSize: 15, fontWeight: '500', letterSpacing: 6 },
+
+  divider: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 4 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: C.border },
+  dividerText: { fontSize: 12, color: C.muted, letterSpacing: 2 },
+
+  googleBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+    borderWidth: 1.5, borderColor: C.dark, backgroundColor: C.card, paddingVertical: 16,
+  },
+  googleG: { fontSize: 18, fontWeight: '900', color: '#B8291C' },
+  googleText: { color: C.dark, fontSize: 15, fontWeight: '600', letterSpacing: 1 },
 });

@@ -75,6 +75,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     }),
+  googleLogin: (idToken: string) =>
+    request<TokenResponse>('/auth/google', {
+      method: 'POST',
+      body: JSON.stringify({ id_token: idToken }),
+    }),
 
   listAlbums: () => request<Album[]>('/albums', undefined, true),
   createAlbum: (data: { title: string; reveal_date: string; max_exposures: number; bgm_url?: string }) =>

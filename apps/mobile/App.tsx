@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { token } from '@/lib/token';
 import { LandingScreen } from '@/screens/LandingScreen';
 import { SignInScreen } from '@/screens/SignInScreen';
@@ -7,13 +7,16 @@ import { AlbumDetailScreen } from '@/screens/AlbumDetailScreen';
 import type { Screen } from '@/types/navigation';
 import type { Album } from '@/lib/types';
 
-function initialScreen(): Screen {
-  return token.get() ? 'albums' : 'landing';
-}
-
 export default function App() {
-  const [screen, setScreen] = useState<Screen>(initialScreen);
+  const [screen, setScreen] = useState<Screen>('landing');
   const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
+
+  // 起動時に永続化トークンを読み込み、あればアルバム一覧へ自動遷移する。
+  useEffect(() => {
+    void token.hydrate().then((t) => {
+      if (t) setScreen('albums');
+    });
+  }, []);
 
   function handleNavigateToAlbum(album: Album) {
     setSelectedAlbum(album);

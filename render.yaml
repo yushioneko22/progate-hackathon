@@ -34,6 +34,13 @@ services:
         sync: false
       - key: SUPABASE_BUCKET
         value: photos
+      # 認証: 自前のセッショントークン(JWT)の署名鍵。ダッシュボードで強い乱数を設定する。
+      - key: JWT_SECRET
+        generateValue: true
+      # Google ログインで許容する client ID。iOS/Android/Web をカンマ区切りで設定する。
+      # 例: "xxx.apps.googleusercontent.com,yyy.apps.googleusercontent.com"
+      - key: GOOGLE_CLIENT_IDS
+        sync: false
       # デプロイした Web フロントから叩く場合のみ、その URL を JSON 配列で設定する。
       # 例: ["https://kawarun-web.onrender.com"]
       # React Native アプリは CORS の対象外なので未設定でも動作する。
