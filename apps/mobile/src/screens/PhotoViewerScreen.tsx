@@ -31,12 +31,15 @@ export function PhotoViewerScreen({ photos, initialIndex, origin, visible, onClo
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const currentIndexRef = useRef(initialIndex);
 
-  const photoScale = useRef(new Animated.Value(1)).current;
-  const photoTX    = useRef(new Animated.Value(0)).current;
-  const photoTY    = useRef(new Animated.Value(0)).current;
-  const photoOp    = useRef(new Animated.Value(1)).current;
-  const fanSlideY  = useRef(new Animated.Value(FAN_H + 20)).current;
-  const headerOp   = useRef(new Animated.Value(0)).current;
+  const photoScale  = useRef(new Animated.Value(1)).current;
+  const photoTX     = useRef(new Animated.Value(0)).current;
+  const photoTY     = useRef(new Animated.Value(0)).current;
+  const photoOp     = useRef(new Animated.Value(1)).current;
+  const fanSlideY   = useRef(new Animated.Value(FAN_H + 20)).current;
+  const headerOp    = useRef(new Animated.Value(0)).current;
+  // photos は非同期で変化するため ref で最新値を保持
+  const photosLenRef = useRef(photos.length);
+  useEffect(() => { photosLenRef.current = photos.length; }, [photos]);
 
   useEffect(() => {
     if (!visible) return;
@@ -110,17 +113,24 @@ export function PhotoViewerScreen({ photos, initialIndex, origin, visible, onClo
       Math.abs(g.dx) > 6 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
     onPanResponderMove: (_, g) => swipeX.setValue(g.dx),
     onPanResponderRelease: (_, g) => {
-      const ci = currentIndexRef.current;
+      const ci  = currentIndexRef.current;
+      const len = photosLenRef.current;
       const goNext = g.dx < -50 || g.vx < -0.5;
       const goPrev = g.dx >  50 || g.vx >  0.5;
 
-      // swipeX は常にリセット
       Animated.spring(swipeX, { toValue: 0, useNativeDriver: true, tension: 200, friction: 12 }).start();
 
-      if (goNext && ci < photos.length - 1) {
-        fadeToPhoto(ci + 1);
-      } else if (goPrev && ci > 0) {
-        fadeToPhoto(ci - 1);
+      let nextIdx = -1;
+      if (goNext && ci < len - 1) nextIdx = ci + 1;
+      else if (goPrev && ci > 0)  nextIdx = ci - 1;
+
+      if (nextIdx >= 0) {
+        Animated.timing(photoOp, { toValue: 0, duration: 120, useNativeDriver: true })
+          .start(() => {
+            setCurrentIndex(nextIdx);
+            currentIndexRef.current = nextIdx;
+            Animated.timing(photoOp, { toValue: 1, duration: 160, useNativeDriver: true }).start();
+          });
       }
     },
   })).current;
