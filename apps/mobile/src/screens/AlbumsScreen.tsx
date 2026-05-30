@@ -4,6 +4,7 @@ import {
   ScrollView, Modal, TextInput, ActivityIndicator, Alert,
   KeyboardAvoidingView, Platform, Animated, PanResponder, Dimensions,
 } from 'react-native';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 const SCREEN_H = Dimensions.get('window').height;
 const CLOSE_THRESHOLD = 100;
@@ -50,7 +51,7 @@ function AlbumCard({ album, onPress }: { album: Album; onPress: () => void }) {
 
       <View style={s.cardBottom}>
         <Text style={s.cardMeta}>{album.photo_count} / {album.max_exposures} EXP</Text>
-        <Text style={s.cardDate}>{album.reveal_date.slice(0, 10)}</Text>
+        <Text style={s.cardDate}>{new Date(album.reveal_date).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -64,7 +65,15 @@ function CreateModal({
   onCreated: (a: Album) => void;
 }) {
   const [title, setTitle] = useState('');
-  const [date, setDate] = useState('');
+  const [revealAt, setRevealAt] = useState<Date>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    d.setHours(12, 0, 0, 0);
+    return d;
+  });
+  // Android は date → time と2ステップで選ぶ
+  const [androidPicker, setAndroidPicker] = useState<'date' | 'time' | null>(null);
+  const [androidTempDate, setAndroidTempDate] = useState<Date | null>(null);
   const [expIdx, setExpIdx] = useState(2);
   const [bgmUrl, setBgmUrl] = useState('');
   const [loading, setLoading] = useState(false);
@@ -108,17 +117,48 @@ function CreateModal({
     })
   ).current;
 
-  function reset() { setTitle(''); setDate(''); setExpIdx(2); setBgmUrl(''); setError(''); }
+  function formatRevealAt(d: Date): string {
+    const DOW = ['日', '月', '火', '水', '木', '金', '土'];
+    const h = d.getHours().toString().padStart(2, '0');
+    const m = d.getMinutes().toString().padStart(2, '0');
+    return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（${DOW[d.getDay()]}）${h}:${m}`;
+  }
+
+  function handleAndroidChange(event: DateTimePickerEvent, picked?: Date) {
+    if (event.type === 'dismissed') { setAndroidPicker(null); return; }
+    if (androidPicker === 'date') {
+      setAndroidTempDate(picked ?? revealAt);
+      setAndroidPicker('time');
+    } else {
+      if (picked && androidTempDate) {
+        const merged = new Date(androidTempDate);
+        merged.setHours(picked.getHours(), picked.getMinutes(), 0, 0);
+        setRevealAt(merged);
+      }
+      setAndroidPicker(null);
+    }
+  }
+
+  function reset() {
+    setTitle('');
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    d.setHours(12, 0, 0, 0);
+    setRevealAt(d);
+    setExpIdx(2);
+    setBgmUrl('');
+    setError('');
+  }
 
   async function handleCreate() {
     if (!title.trim()) { setError('タイトルを入力してください'); return; }
-    if (!date.match(/^\d{4}-\d{2}-\d{2}$/)) { setError('日付は YYYY-MM-DD 形式で入力してください'); return; }
+    if (revealAt <= new Date()) { setError('現像日時は未来の日時を選択してください'); return; }
     setError('');
     setLoading(true);
     try {
       const album = await api.createAlbum({
         title: title.trim(),
-        reveal_date: date,
+        reveal_date: revealAt.toISOString(),
         max_exposures: EXP_OPTIONS[expIdx],
         ...(bgmUrl.trim() ? { bgm_url: bgmUrl.trim() } : {}),
       });
@@ -162,15 +202,43 @@ function CreateModal({
               </View>
 
               <View style={s.field}>
-                <Text style={s.label}>現像日 (YYYY-MM-DD)</Text>
-                <TextInput
-                  style={s.input}
-                  value={date}
-                  onChangeText={setDate}
-                  placeholder="2025-08-31"
-                  placeholderTextColor={C.muted}
-                  keyboardType="numbers-and-punctuation"
-                />
+                <Text style={s.label}>現像日時</Text>
+
+                {/* iOS: compact picker をそのまま表示 */}
+                {Platform.OS === 'ios' && (
+                  <View style={s.iosPickerWrap}>
+                    <DateTimePicker
+                      value={revealAt}
+                      mode="datetime"
+                      display="inline"
+                      minimumDate={new Date()}
+                      locale="ja-JP"
+                      onChange={(_, d) => { if (d) setRevealAt(d); }}
+                      style={s.iosPicker}
+                    />
+                  </View>
+                )}
+
+                {/* Android: ボタンタップでダイアログ */}
+                {Platform.OS === 'android' && (
+                  <>
+                    <TouchableOpacity
+                      style={s.dateBtn}
+                      onPress={() => setAndroidPicker('date')}
+                    >
+                      <Text style={s.dateBtnText}>📅  {formatRevealAt(revealAt)}</Text>
+                    </TouchableOpacity>
+                    {androidPicker !== null && (
+                      <DateTimePicker
+                        value={androidPicker === 'time' ? (androidTempDate ?? revealAt) : revealAt}
+                        mode={androidPicker}
+                        display="default"
+                        minimumDate={androidPicker === 'date' ? new Date() : undefined}
+                        onChange={handleAndroidChange}
+                      />
+                    )}
+                  </>
+                )}
               </View>
 
               <View style={s.field}>
@@ -360,6 +428,19 @@ const s = StyleSheet.create({
   expChipTextActive: { color: '#F5EDD8' },
 
   error: { color: C.red, fontSize: 13, marginBottom: 8 },
+
+  iosPickerWrap: {
+    backgroundColor: C.card,
+    borderWidth: 1.5, borderColor: C.border,
+    borderRadius: 4, overflow: 'hidden',
+  },
+  iosPicker: { height: 380 },
+
+  dateBtn: {
+    borderWidth: 1.5, borderColor: C.border, backgroundColor: '#fff',
+    paddingHorizontal: 14, paddingVertical: 14,
+  },
+  dateBtnText: { fontSize: 14, color: C.dark },
 
   btn: { backgroundColor: C.dark, paddingVertical: 16, alignItems: 'center' },
   btnDisabled: { opacity: 0.6 },

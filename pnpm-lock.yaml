@@ -23,6 +23,9 @@ importers:
       '@expo/metro-runtime':
         specifier: ~5.0.4
         version: 5.0.5(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))
+      '@react-native-community/datetimepicker':
+        specifier: 8.4.4
+        version: 8.4.4(expo@54.0.34(@babel/core@7.29.0)(@expo/metro-runtime@5.0.5(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)))(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)(typescript@5.9.3))(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
       expo:
         specifier: ~54.0.0
         version: 54.0.34(@babel/core@7.29.0)(@expo/metro-runtime@5.0.5(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)))(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)(typescript@5.9.3)
@@ -1026,6 +1029,19 @@ packages:
   '@nolyfill/is-core-module@1.0.39':
     resolution: {integrity: sha512-nn5ozdjYQpUCZlWGuxcJY/KpxkWQs4DcbMCmKojjyrYDEAGy4Ce19NN4v5MduafTwJlbKc99UA8YhSVqq9yPZA==}
     engines: {node: '>=12.4.0'}
+
+  '@react-native-community/datetimepicker@8.4.4':
+    resolution: {integrity: sha512-bc4ZixEHxZC9/qf5gbdYvIJiLZ5CLmEsC3j+Yhe1D1KC/3QhaIfGDVdUcid0PdlSoGOSEq4VlB93AWyetEyBSQ==}
+    peerDependencies:
+      expo: '>=52.0.0'
+      react: '*'
+      react-native: '*'
+      react-native-windows: '*'
+    peerDependenciesMeta:
+      expo:
+        optional: true
+      react-native-windows:
+        optional: true
 
   '@react-native/assets-registry@0.81.4':
     resolution: {integrity: sha512-AMcDadefBIjD10BRqkWw+W/VdvXEomR6aEZ0fhQRAv7igrBzb4PTn4vHKYg+sUK0e3wa74kcMy2DLc/HtnGcMA==}
@@ -5235,6 +5251,14 @@ snapshots:
       fastq: 1.20.1
 
   '@nolyfill/is-core-module@1.0.39': {}
+
+  '@react-native-community/datetimepicker@8.4.4(expo@54.0.34(@babel/core@7.29.0)(@expo/metro-runtime@5.0.5(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)))(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)(typescript@5.9.3))(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)':
+    dependencies:
+      invariant: 2.2.4
+      react: 19.1.0
+      react-native: 0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)
+    optionalDependencies:
+      expo: 54.0.34(@babel/core@7.29.0)(@expo/metro-runtime@5.0.5(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)))(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)(typescript@5.9.3)
 
   '@react-native/assets-registry@0.81.4': {}
 
