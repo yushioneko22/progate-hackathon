@@ -310,6 +310,19 @@ export function AlbumsScreen({ onNavigate, onNavigateToAlbum }: { onNavigate: (s
 
   useEffect(() => { load(); }, [load]);
 
+  // 最も近い SEALED アルバムの現像日時にタイマーをセット → 自動リロード
+  useEffect(() => {
+    const sealedTimes = albums
+      .filter(a => a.status === 'sealed')
+      .map(a => new Date(a.reveal_date).getTime())
+      .filter(t => t > Date.now())
+      .sort((a, b) => a - b);
+    if (sealedTimes.length === 0) return;
+    const delay = sealedTimes[0] - Date.now();
+    const timer = setTimeout(() => load(), delay + 500); // 500ms マージン
+    return () => clearTimeout(timer);
+  }, [albums, load]);
+
   function handleSignOut() {
     token.remove();
     onNavigate('landing');
