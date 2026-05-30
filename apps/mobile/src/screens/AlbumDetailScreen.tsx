@@ -6,6 +6,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { api } from '../lib/api';
 import type { Album, Photo } from '../lib/types';
+import { SlideshowScreen } from './SlideshowScreen';
 
 const C = {
   bg: '#E8D5B0', card: '#F8F0DC', dark: '#1C1208',
@@ -69,11 +70,12 @@ function SealedView({ album, count }: { album: Album; count: number }) {
 }
 
 function OpenedView({
-  album, photos, loading,
+  album, photos, loading, onStartSlideshow,
 }: {
   album: Album;
   photos: Photo[];
   loading: boolean;
+  onStartSlideshow: () => void;
 }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(40)).current;
@@ -94,6 +96,12 @@ function OpenedView({
         <Text style={s.revealEmoji}>📸</Text>
         <Text style={s.revealTitle}>現 像 完 了 ！</Text>
         <Text style={s.revealDate}>{album.reveal_date.slice(0, 10)} に現像されました</Text>
+
+        {!loading && photos.length > 0 && (
+          <TouchableOpacity style={s.movieBtn} onPress={onStartSlideshow} activeOpacity={0.85}>
+            <Text style={s.movieBtnText}>▶  フォトムービーを再生</Text>
+          </TouchableOpacity>
+        )}
       </Animated.View>
 
       {loading ? (
@@ -129,6 +137,7 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loadingPhotos, setLoadingPhotos] = useState(!isSealed);
   const [uploading, setUploading] = useState(false);
+  const [slideshowVisible, setSlideshowVisible] = useState(false);
 
   useEffect(() => {
     if (isSealed) return;
@@ -200,7 +209,7 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
 
       {isSealed
         ? <SealedView album={album} count={count} />
-        : <OpenedView album={album} photos={photos} loading={loadingPhotos} />}
+        : <OpenedView album={album} photos={photos} loading={loadingPhotos} onStartSlideshow={() => setSlideshowVisible(true)} />}
 
       {count < album.max_exposures && (
         <TouchableOpacity style={s.fab} onPress={handleAddPhoto} activeOpacity={0.85}>
@@ -214,6 +223,13 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
           <Text style={s.uploadText}>アップロード中...</Text>
         </View>
       )}
+
+      <SlideshowScreen
+        photos={photos}
+        albumTitle={album.title}
+        visible={slideshowVisible}
+        onClose={() => setSlideshowVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -303,6 +319,16 @@ const s = StyleSheet.create({
 
   emptyPhotos: { padding: 32, alignItems: 'center' },
   emptyPhotosText: { color: C.muted, fontSize: 14 },
+
+  movieBtn: {
+    marginTop: 12,
+    paddingHorizontal: 24, paddingVertical: 12,
+    backgroundColor: C.dark,
+    borderRadius: 4,
+  },
+  movieBtnText: {
+    color: '#F5EDD8', fontSize: 14, fontWeight: '700', letterSpacing: 1.5,
+  },
 
   // 撮影 FAB / アップロード中
   fab: {
