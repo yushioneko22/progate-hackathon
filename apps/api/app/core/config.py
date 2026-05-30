@@ -31,5 +31,9 @@ class Settings(BaseSettings):
     supabase_key: str = ""
     supabase_bucket: str = "photos"
 
+    # リアルタイムフィルタープレビュー (Phase B / 課金機能) の解放フラグ。
+    # 現状は器のみ。課金連携を入れる際はユーザー単位の判定に置き換える。
+    realtime_preview_enabled: bool = False
+
 
 settings = Settings()

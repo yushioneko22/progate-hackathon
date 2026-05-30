@@ -35,6 +35,24 @@ export type Photo = {
   id: string;
   album_id: string;
   url: string;
+  filter_preset: string | null;
   taken_at: string | null;
   created_at: string;
+};
+
+// /filters で配信されるプリセット定義(サーバー/クライアント共通の真実の源)。
+// Phase B のリアルタイムプレビューでクライアント(Skia)が同じ定義を解釈する。
+export type FilterPreset = {
+  id: string;
+  name: string;
+  description: string;
+  color_matrix: number[];
+  vignette: { intensity: number; radius: number };
+  grain: { amount: number };
+};
+
+export type FiltersResponse = {
+  presets: FilterPreset[];
+  default_preset: string;
+  realtime_preview_enabled: boolean;
 };

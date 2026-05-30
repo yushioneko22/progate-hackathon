@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import CurrentUser
@@ -32,6 +32,7 @@ async def upload_photo(
     service: ServiceDep,
     current_user: CurrentUser,
     file: Annotated[UploadFile, File()],
+    filter_preset: Annotated[str | None, Form()] = None,
 ) -> PhotoRead:
     data = await file.read()
     return await service.upload(
@@ -39,4 +40,5 @@ async def upload_photo(
         user_id=current_user.id,
         data=data,
         content_type=file.content_type or "image/jpeg",
+        filter_preset=filter_preset,
     )

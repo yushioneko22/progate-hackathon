@@ -37,12 +37,16 @@ class PhotoRepository:
         album_id: uuid.UUID,
         uploaded_by: uuid.UUID,
         storage_key: str,
+        original_key: str | None = None,
+        filter_preset: str | None = None,
         taken_at: datetime | None = None,
     ) -> Photo:
         photo = Photo(
             album_id=album_id,
             uploaded_by=uploaded_by,
             storage_key=storage_key,
+            original_key=original_key,
+            filter_preset=filter_preset,
             taken_at=taken_at,
         )
         self._session.add(photo)

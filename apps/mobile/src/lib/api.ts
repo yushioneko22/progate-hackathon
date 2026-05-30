@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import { token } from './token';
-import type { Album, Photo, Todo, TokenResponse } from './types';
+import type { Album, FiltersResponse, Photo, Todo, TokenResponse } from './types';
 
 function resolveApiUrl(): string {
   const fromEnv = process.env.EXPO_PUBLIC_API_URL;
@@ -59,6 +59,7 @@ export const api = {
   uploadPhoto: (
     albumId: string,
     asset: { uri: string; fileName?: string | null; mimeType?: string | null },
+    filterPreset?: string,
   ) => {
     const form = new FormData();
     form.append('file', {
@@ -66,6 +67,10 @@ export const api = {
       name: asset.fileName ?? `photo-${Date.now()}.jpg`,
       type: asset.mimeType ?? 'image/jpeg',
     } as unknown as Blob);
+    // 省略時はサーバー側の既定プリセットで焼き込まれる
+    if (filterPreset) form.append('filter_preset', filterPreset);
     return request<Photo>(`/albums/${albumId}/photos`, { method: 'POST', body: form }, true);
   },
+
+  listFilters: () => request<FiltersResponse>('/filters', undefined, true),
 };

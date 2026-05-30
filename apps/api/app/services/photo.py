@@ -5,6 +5,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import storage
+from app.filters import engine, presets
 from app.models.photo import Photo
 from app.repositories.photo import PhotoRepository
 from app.schemas.photo import PhotoRead
@@ -22,6 +23,7 @@ class PhotoService:
         user_id: uuid.UUID,
         data: bytes,
         content_type: str,
+        filter_preset: str | None = None,
     ) -> PhotoRead:
         album = await self._repo.get_album(album_id)
         if album is None:
@@ -34,15 +36,32 @@ class PhotoService:
         if count >= album.max_exposures:
             raise HTTPException(status.HTTP_409_CONFLICT, detail="フィルムを使い切りました")
 
+        # フィルターを焼き込む。原本も保持してリバーシブルにする(後から焼き直せる)。
+        preset = presets.get_preset(filter_preset)
         try:
-            key = await storage.upload_photo(data=data, content_type=content_type)
+            filtered = engine.apply_preset(data=data, preset=preset)
+        except Exception:  # noqa: BLE001 - 破損画像など。原本でフォールバック。
+            filtered, preset = None, presets.get_preset("none")
+
+        try:
+            original_key = await storage.upload_photo(data=data, content_type=content_type)
+            if filtered is None:
+                display_key = original_key
+            else:
+                display_key = await storage.upload_photo(
+                    data=filtered, content_type="image/jpeg"
+                )
         except httpx.HTTPError as err:
             raise HTTPException(
                 status.HTTP_502_BAD_GATEWAY, detail="ストレージへの保存に失敗しました"
             ) from err
 
         photo = await self._repo.create(
-            album_id=album_id, uploaded_by=user_id, storage_key=key
+            album_id=album_id,
+            uploaded_by=user_id,
+            storage_key=display_key,
+            original_key=original_key,
+            filter_preset=preset["id"],
         )
         await self._session.commit()
         await self._session.refresh(photo)
@@ -62,6 +81,7 @@ class PhotoService:
             id=photo.id,
             album_id=photo.album_id,
             url=storage.public_url(photo.storage_key),
+            filter_preset=photo.filter_preset,
             taken_at=photo.taken_at,
             created_at=photo.created_at,
         )
