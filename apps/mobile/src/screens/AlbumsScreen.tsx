@@ -296,6 +296,7 @@ export function AlbumsScreen({ onNavigate, onNavigateToAlbum }: { onNavigate: (s
   const [albums, setAlbums] = useState<Album[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
   const load = useCallback(async () => {
     try {
@@ -323,6 +324,12 @@ export function AlbumsScreen({ onNavigate, onNavigateToAlbum }: { onNavigate: (s
     return () => clearTimeout(timer);
   }, [albums, load]);
 
+  const sortedAlbums = [...albums].sort((a, b) => {
+    const ta = new Date(a.reveal_date).getTime();
+    const tb = new Date(b.reveal_date).getTime();
+    return sortOrder === 'desc' ? tb - ta : ta - tb;
+  });
+
   function handleSignOut() {
     token.remove();
     onNavigate('landing');
@@ -332,6 +339,9 @@ export function AlbumsScreen({ onNavigate, onNavigateToAlbum }: { onNavigate: (s
     <SafeAreaView style={s.safe}>
       <View style={s.header}>
         <Text style={s.headerTitle}>現 像 所</Text>
+        <TouchableOpacity onPress={() => setSortOrder(o => o === 'desc' ? 'asc' : 'desc')} style={s.sortBtn}>
+          <Text style={s.sortBtnText}>{sortOrder === 'desc' ? '↓ 新しい順' : '↑ 古い順'}</Text>
+        </TouchableOpacity>
         <TouchableOpacity onPress={handleSignOut}>
           <Text style={s.signout}>ログアウト</Text>
         </TouchableOpacity>
@@ -352,7 +362,7 @@ export function AlbumsScreen({ onNavigate, onNavigateToAlbum }: { onNavigate: (s
         </View>
       ) : (
         <ScrollView contentContainerStyle={s.list} showsVerticalScrollIndicator={false}>
-          {albums.map(a => <AlbumCard key={a.id} album={a} onPress={() => onNavigateToAlbum(a)} />)}
+          {sortedAlbums.map(a => <AlbumCard key={a.id} album={a} onPress={() => onNavigateToAlbum(a)} />)}
           <View style={{ height: 100 }} />
         </ScrollView>
       )}
@@ -379,6 +389,8 @@ const s = StyleSheet.create({
     borderBottomWidth: 1.5, borderBottomColor: C.dark,
   },
   headerTitle: { fontSize: 16, fontWeight: '900', color: C.dark, letterSpacing: 6 },
+  sortBtn: { paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: C.border },
+  sortBtnText: { fontSize: 11, color: C.muted, fontWeight: '600' },
   signout: { fontSize: 13, color: C.muted },
 
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
