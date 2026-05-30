@@ -23,6 +23,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    env_file:
+      - apps/api/.env
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-todo}:${POSTGRES_PASSWORD:-todo}@db:5432/${POSTGRES_DB:-todo}
       CORS_ORIGINS: '["http://localhost:3000","http://localhost:8081","http://localhost:19006"]'

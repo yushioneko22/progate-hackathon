@@ -3,10 +3,13 @@ import {
   View, Text, TouchableOpacity, StyleSheet, SafeAreaView,
   ScrollView, Animated, Dimensions, Image, ActivityIndicator, Alert, Modal,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { api } from '../lib/api';
 import type { Album, FilterPreset, Photo } from '../lib/types';
+import { PhotoSelectScreen } from './PhotoSelectScreen';
+import { ShakeRevealScreen } from './ShakeRevealScreen';
 import { SlideshowScreen } from './SlideshowScreen';
 
 // 送信前に端末側で長辺をこのサイズに収める。フル解像度のままだと端末→サーバーの
@@ -48,6 +51,14 @@ const C = {
   border: '#D4C4A0',
 };
 
+function formatRevealDate(isoString: string): string {
+  const d = new Date(isoString);
+  const DOW = ['日', '月', '火', '水', '木', '金', '土'];
+  const h = d.getHours().toString().padStart(2, '0');
+  const m = d.getMinutes().toString().padStart(2, '0');
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（${DOW[d.getDay()]}）${h}:${m}`;
+}
+
 const { width: SW } = Dimensions.get('window');
 
 function SealedView({ album, count }: { album: Album; count: number }) {
@@ -87,7 +98,7 @@ function SealedView({ album, count }: { album: Album; count: number }) {
         </View>
 
         <Text style={s.sealedDesc}>
-          現像日 {album.reveal_date.slice(0, 10)} まで{'\n'}写真は封印されています（今のうちに撮影できます）
+          現像日時 {formatRevealDate(album.reveal_date)} まで{'\n'}写真は封印されています（今のうちに撮影できます）
         </Text>
 
         <View style={s.filmInfo}>
@@ -129,7 +140,7 @@ function OpenedView({
       <Animated.View style={[s.revealBanner, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
         <Text style={s.revealEmoji}>📸</Text>
         <Text style={s.revealTitle}>現 像 完 了 ！</Text>
-        <Text style={s.revealDate}>{album.reveal_date.slice(0, 10)} に現像されました</Text>
+        <Text style={s.revealDate}>{formatRevealDate(album.reveal_date)} に現像されました</Text>
 
         {!loading && photos.length > 0 && (
           <TouchableOpacity style={s.movieBtn} onPress={onStartSlideshow} activeOpacity={0.85}>
@@ -171,6 +182,8 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loadingPhotos, setLoadingPhotos] = useState(!isSealed);
   const [uploading, setUploading] = useState(false);
+  const [photoSelectVisible, setPhotoSelectVisible] = useState(false);
+  const [slideshowPhotos, setSlideshowPhotos] = useState<Photo[]>([]);
   const [slideshowVisible, setSlideshowVisible] = useState(false);
   const [filters, setFilters] = useState<FilterPreset[]>([]);
   const [defaultPreset, setDefaultPreset] = useState('classic-film');
@@ -178,6 +191,18 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
   const [pendingAsset, setPendingAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
   // モーダルで選択中のフィルター(確認ボタンを押すまで確定しない)
   const [selectedPreset, setSelectedPreset] = useState('classic-film');
+  // null = 確認中, false = 未開封（シェイク演出を表示）, true = 開封済み
+  const [revealed, setRevealed] = useState<boolean | null>(isSealed ? true : null);
+
+  useEffect(() => {
+    if (isSealed) return;
+    AsyncStorage.getItem(`revealed_${album.id}`).then(v => setRevealed(v === 'true'));
+  }, [album.id, isSealed]);
+
+  async function handleReveal() {
+    await AsyncStorage.setItem(`revealed_${album.id}`, 'true');
+    setRevealed(true);
+  }
 
   useEffect(() => {
     if (isSealed) return;
@@ -267,6 +292,17 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
     ]);
   }
 
+  // 初回のみシェイク開封演出（写真読み込み完了後に表示）
+  if (!isSealed && revealed === false && photos.length > 0) {
+    return (
+      <ShakeRevealScreen
+        photos={photos}
+        albumTitle={album.title}
+        onReveal={handleReveal}
+      />
+    );
+  }
+
   return (
     <SafeAreaView style={s.safe}>
       <View style={s.header}>
@@ -283,7 +319,7 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
 
       {isSealed
         ? <SealedView album={album} count={count} />
-        : <OpenedView album={album} photos={photos} loading={loadingPhotos} onStartSlideshow={() => setSlideshowVisible(true)} />}
+        : <OpenedView album={album} photos={photos} loading={loadingPhotos} onStartSlideshow={() => setPhotoSelectVisible(true)} />}
 
       {count < album.max_exposures && (
         <TouchableOpacity style={s.fab} onPress={handleAddPhoto} activeOpacity={0.85}>
@@ -357,12 +393,26 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
       </Modal>
 
       <SlideshowScreen
-        photos={photos}
+        photos={slideshowPhotos}
         albumTitle={album.title}
         bgmUrl={album.bgm_url}
         visible={slideshowVisible}
         onClose={() => setSlideshowVisible(false)}
       />
+
+      {photoSelectVisible && (
+        <View style={StyleSheet.absoluteFill}>
+          <PhotoSelectScreen
+            photos={photos}
+            onBack={() => setPhotoSelectVisible(false)}
+            onPlay={selected => {
+              setSlideshowPhotos(selected);
+              setPhotoSelectVisible(false);
+              setSlideshowVisible(true);
+            }}
+          />
+        </View>
+      )}
     </SafeAreaView>
   );
 }

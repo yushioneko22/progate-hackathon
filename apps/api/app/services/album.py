@@ -1,5 +1,6 @@
+import math
 import uuid
-from datetime import date
+from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,16 +38,21 @@ class AlbumService:
 
     @staticmethod
     def _to_read(album: Album) -> AlbumRead:
-        today = date.today()
-        is_opened = album.reveal_date <= today
+        now = datetime.now(timezone.utc)
+        reveal = album.reveal_date
+        # DB から取得した datetime が naive の場合は UTC と見なす
+        if reveal.tzinfo is None:
+            reveal = reveal.replace(tzinfo=timezone.utc)
+        is_opened = reveal <= now
+        days_left = None if is_opened else math.ceil((reveal - now).total_seconds() / 86400)
         return AlbumRead(
             id=album.id,
             title=album.title,
-            reveal_date=album.reveal_date,
+            reveal_date=reveal,
             max_exposures=album.max_exposures,
             bgm_url=album.bgm_url,
             status="opened" if is_opened else "sealed",
-            days_left=None if is_opened else (album.reveal_date - today).days,
+            days_left=days_left,
             member_count=len(album.members),
             photo_count=len(album.photos),
             created_at=album.created_at,

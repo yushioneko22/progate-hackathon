@@ -1,12 +1,12 @@
 import uuid
-from datetime import date, datetime
+from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class AlbumCreate(BaseModel):
     title: str = Field(min_length=1, max_length=100)
-    reveal_date: date
+    reveal_date: datetime
     max_exposures: int = Field(default=27, ge=1, le=99)
     bgm_url: str | None = Field(default=None, max_length=500)
 
@@ -16,7 +16,7 @@ class AlbumRead(BaseModel):
 
     id: uuid.UUID
     title: str
-    reveal_date: date
+    reveal_date: datetime
     max_exposures: int
     bgm_url: str | None
     status: str          # "sealed" | "opened"
