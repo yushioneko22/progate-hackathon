@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { api } from '../lib/api';
 import type { Album, Photo } from '../lib/types';
+import { PhotoSelectScreen } from './PhotoSelectScreen';
 import { ShakeRevealScreen } from './ShakeRevealScreen';
 import { SlideshowScreen } from './SlideshowScreen';
 
@@ -147,6 +148,8 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loadingPhotos, setLoadingPhotos] = useState(!isSealed);
   const [uploading, setUploading] = useState(false);
+  const [photoSelectVisible, setPhotoSelectVisible] = useState(false);
+  const [slideshowPhotos, setSlideshowPhotos] = useState<Photo[]>([]);
   const [slideshowVisible, setSlideshowVisible] = useState(false);
   // null = 確認中, false = 未開封（シェイク演出を表示）, true = 開封済み
   const [revealed, setRevealed] = useState<boolean | null>(isSealed ? true : null);
@@ -242,7 +245,7 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
 
       {isSealed
         ? <SealedView album={album} count={count} />
-        : <OpenedView album={album} photos={photos} loading={loadingPhotos} onStartSlideshow={() => setSlideshowVisible(true)} />}
+        : <OpenedView album={album} photos={photos} loading={loadingPhotos} onStartSlideshow={() => setPhotoSelectVisible(true)} />}
 
       {count < album.max_exposures && (
         <TouchableOpacity style={s.fab} onPress={handleAddPhoto} activeOpacity={0.85}>
@@ -258,12 +261,26 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
       )}
 
       <SlideshowScreen
-        photos={photos}
+        photos={slideshowPhotos}
         albumTitle={album.title}
         bgmUrl={album.bgm_url}
         visible={slideshowVisible}
         onClose={() => setSlideshowVisible(false)}
       />
+
+      {photoSelectVisible && (
+        <View style={StyleSheet.absoluteFill}>
+          <PhotoSelectScreen
+            photos={photos}
+            onBack={() => setPhotoSelectVisible(false)}
+            onPlay={selected => {
+              setSlideshowPhotos(selected);
+              setPhotoSelectVisible(false);
+              setSlideshowVisible(true);
+            }}
+          />
+        </View>
+      )}
     </SafeAreaView>
   );
 }
