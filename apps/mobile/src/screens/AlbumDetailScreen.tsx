@@ -9,6 +9,7 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { api } from '../lib/api';
 import type { Album, FilterPreset, Photo } from '../lib/types';
 import { PhotoSelectScreen } from './PhotoSelectScreen';
+import { PhotoViewerScreen, type Origin } from './PhotoViewerScreen';
 import { ShakeRevealScreen } from './ShakeRevealScreen';
 import { SlideshowScreen } from './SlideshowScreen';
 
@@ -133,15 +134,17 @@ function SealedView({ album, count }: { album: Album; count: number }) {
 }
 
 function OpenedView({
-  album, photos, loading, onStartSlideshow,
+  album, photos, loading, onStartSlideshow, onPhotoPress,
 }: {
   album: Album;
   photos: Photo[];
   loading: boolean;
   onStartSlideshow: () => void;
+  onPhotoPress: (index: number, origin: Origin | null) => void;
 }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(40)).current;
+  const photoRefs = useRef<Array<View | null>>([]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -180,12 +183,29 @@ function OpenedView({
           {photos.map((p, i) => {
             const rotation = (i % 3 === 0 ? -2 : i % 3 === 1 ? 1 : -1) + (i % 2 === 0 ? 0.5 : -0.5);
             return (
-              <View key={p.id} style={[s.polaroid, { transform: [{ rotate: `${rotation}deg` }] }]}>
-                <View style={s.photoArea}>
+              <TouchableOpacity
+                key={p.id}
+                activeOpacity={0.85}
+                onPress={() => {
+                  const ref = photoRefs.current[i];
+                  if (ref) {
+                    ref.measure((_x, _y, w, h, px, py) =>
+                      onPhotoPress(i, { x: px, y: py, width: w, height: h })
+                    );
+                  } else {
+                    onPhotoPress(i, null);
+                  }
+                }}
+                style={[s.polaroid, { transform: [{ rotate: `${rotation}deg` }] }]}
+              >
+                <View
+                  ref={r => { photoRefs.current[i] = r; }}
+                  style={s.photoArea}
+                >
                   <Image source={{ uri: p.url }} style={s.photoImg} resizeMode="cover" />
                 </View>
                 <View style={s.polaroidCaption} />
-              </View>
+              </TouchableOpacity>
             );
           })}
         </Animated.View>
@@ -204,6 +224,9 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
   const [photoSelectVisible, setPhotoSelectVisible] = useState(false);
   const [slideshowPhotos, setSlideshowPhotos] = useState<Photo[]>([]);
   const [slideshowVisible, setSlideshowVisible] = useState(false);
+  const [viewerVisible, setViewerVisible] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
+  const [viewerOrigin, setViewerOrigin] = useState<Origin | null>(null);
   const [filters, setFilters] = useState<FilterPreset[]>([]);
   const [defaultPreset, setDefaultPreset] = useState('classic-film');
   const [pendingAsset, setPendingAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
@@ -234,7 +257,10 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
     if (isSealed) return;
     api
       .listPhotos(album.id)
-      .then(setPhotos)
+      .then(data => {
+        setPhotos(data);
+        data.forEach(p => Image.prefetch(p.url).catch(() => {}));
+      })
       .catch(() => Alert.alert('エラー', '写真の読み込みに失敗しました'))
       .finally(() => setLoadingPhotos(false));
   }, [album.id, isSealed]);
@@ -345,7 +371,13 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
 
       {isSealed
         ? <SealedView album={album} count={count} />
-        : <OpenedView album={album} photos={photos} loading={loadingPhotos} onStartSlideshow={() => setPhotoSelectVisible(true)} />}
+        : <OpenedView
+            album={album}
+            photos={photos}
+            loading={loadingPhotos}
+            onStartSlideshow={() => setPhotoSelectVisible(true)}
+            onPhotoPress={(i, origin) => { setViewerIndex(i); setViewerOrigin(origin); setViewerVisible(true); }}
+          />}
 
       {count < album.max_exposures && (
         <TouchableOpacity style={s.fab} onPress={handleAddPhoto} activeOpacity={0.85}>
@@ -424,6 +456,14 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
         bgmUrl={album.bgm_url}
         visible={slideshowVisible}
         onClose={() => setSlideshowVisible(false)}
+      />
+
+      <PhotoViewerScreen
+        photos={photos}
+        initialIndex={viewerIndex}
+        origin={viewerOrigin}
+        visible={viewerVisible}
+        onClose={() => setViewerVisible(false)}
       />
 
       {photoSelectVisible && (
