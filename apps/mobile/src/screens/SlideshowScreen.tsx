@@ -6,6 +6,8 @@ import {
 import { Audio } from 'expo-av';
 import type { Photo } from '../lib/types';
 
+const DEFAULT_BGM = require('../../assets/bgm.mp3');
+
 const { width: SW, height: SH } = Dimensions.get('window');
 const PHOTO_MS = 3500;   // how long each photo stays
 const FADE_MS = 900;     // crossfade duration
@@ -79,11 +81,11 @@ export function SlideshowScreen({ photos, albumTitle, bgmUrl, visible, onClose }
       return;
     }
 
-    if (!bgmUrl) return;
+    const source = bgmUrl ? { uri: bgmUrl } : DEFAULT_BGM;
 
     let sound: Audio.Sound | null = null;
     Audio.setAudioModeAsync({ playsInSilentModeIOS: true })
-      .then(() => Audio.Sound.createAsync({ uri: bgmUrl }, { isLooping: true, volume: 0.65 }))
+      .then(() => Audio.Sound.createAsync(source, { isLooping: true, volume: 0.65 }))
       .then(({ sound: s }) => {
         sound = s;
         soundRef.current = s;
