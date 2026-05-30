@@ -3,9 +3,11 @@ import {
   View, Text, TouchableOpacity, StyleSheet, SafeAreaView,
   ScrollView, Animated, Dimensions, Image, ActivityIndicator, Alert,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { api } from '../lib/api';
 import type { Album, Photo } from '../lib/types';
+import { ShakeRevealScreen } from './ShakeRevealScreen';
 import { SlideshowScreen } from './SlideshowScreen';
 
 const C = {
@@ -146,6 +148,18 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
   const [loadingPhotos, setLoadingPhotos] = useState(!isSealed);
   const [uploading, setUploading] = useState(false);
   const [slideshowVisible, setSlideshowVisible] = useState(false);
+  // null = 確認中, false = 未開封（シェイク演出を表示）, true = 開封済み
+  const [revealed, setRevealed] = useState<boolean | null>(isSealed ? true : null);
+
+  useEffect(() => {
+    if (isSealed) return;
+    AsyncStorage.getItem(`revealed_${album.id}`).then(v => setRevealed(v === 'true'));
+  }, [album.id, isSealed]);
+
+  async function handleReveal() {
+    await AsyncStorage.setItem(`revealed_${album.id}`, 'true');
+    setRevealed(true);
+  }
 
   useEffect(() => {
     if (isSealed) return;
@@ -199,6 +213,17 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
       { text: 'ライブラリから選択', onPress: () => pickAndUpload('library') },
       { text: 'キャンセル', style: 'cancel' },
     ]);
+  }
+
+  // 初回のみシェイク開封演出（写真読み込み完了後に表示）
+  if (!isSealed && revealed === false && photos.length > 0) {
+    return (
+      <ShakeRevealScreen
+        photos={photos}
+        albumTitle={album.title}
+        onReveal={handleReveal}
+      />
+    );
   }
 
   return (
