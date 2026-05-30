@@ -257,7 +257,10 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
     if (isSealed) return;
     api
       .listPhotos(album.id)
-      .then(setPhotos)
+      .then(data => {
+        setPhotos(data);
+        data.forEach(p => Image.prefetch(p.url).catch(() => {}));
+      })
       .catch(() => Alert.alert('エラー', '写真の読み込みに失敗しました'))
       .finally(() => setLoadingPhotos(false));
   }, [album.id, isSealed]);
