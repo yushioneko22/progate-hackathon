@@ -1,5 +1,5 @@
 import uuid
-from datetime import date
+from datetime import datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,7 +29,7 @@ class AlbumRepository:
         *,
         title: str,
         created_by: uuid.UUID,
-        reveal_date: date,
+        reveal_date: datetime,
         max_exposures: int,
         bgm_url: str | None = None,
     ) -> Album:

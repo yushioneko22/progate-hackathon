@@ -14,6 +14,14 @@ const C = {
   border: '#D4C4A0',
 };
 
+function formatRevealDate(isoString: string): string {
+  const d = new Date(isoString);
+  const DOW = ['日', '月', '火', '水', '木', '金', '土'];
+  const h = d.getHours().toString().padStart(2, '0');
+  const m = d.getMinutes().toString().padStart(2, '0');
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（${DOW[d.getDay()]}）${h}:${m}`;
+}
+
 const { width: SW } = Dimensions.get('window');
 
 function SealedView({ album, count }: { album: Album; count: number }) {
@@ -53,7 +61,7 @@ function SealedView({ album, count }: { album: Album; count: number }) {
         </View>
 
         <Text style={s.sealedDesc}>
-          現像日 {album.reveal_date.slice(0, 10)} まで{'\n'}写真は封印されています（今のうちに撮影できます）
+          現像日時 {formatRevealDate(album.reveal_date)} まで{'\n'}写真は封印されています（今のうちに撮影できます）
         </Text>
 
         <View style={s.filmInfo}>
@@ -95,7 +103,7 @@ function OpenedView({
       <Animated.View style={[s.revealBanner, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
         <Text style={s.revealEmoji}>📸</Text>
         <Text style={s.revealTitle}>現 像 完 了 ！</Text>
-        <Text style={s.revealDate}>{album.reveal_date.slice(0, 10)} に現像されました</Text>
+        <Text style={s.revealDate}>{formatRevealDate(album.reveal_date)} に現像されました</Text>
 
         {!loading && photos.length > 0 && (
           <TouchableOpacity style={s.movieBtn} onPress={onStartSlideshow} activeOpacity={0.85}>
