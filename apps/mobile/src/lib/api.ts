@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import { token } from './token';
-import type { Album, Photo, Todo, TokenResponse } from './types';
+import type { Album, FiltersResponse, Photo, Todo, TokenResponse } from './types';
 
 function resolveApiUrl(): string {
   const fromEnv = process.env.EXPO_PUBLIC_API_URL;
@@ -10,6 +10,10 @@ function resolveApiUrl(): string {
 }
 
 const API_URL = resolveApiUrl();
+
+// リクエストのタイムアウト(ms)。fetch は標準でタイムアウトしないため、
+// AbortController で打ち切って UI がハングしないようにする。
+const REQUEST_TIMEOUT_MS = 30_000;
 
 async function request<T>(path: string, init?: RequestInit, auth = false): Promise<T> {
   // FormData の場合は content-type を指定しない(fetch が boundary 付きで自動設定する)
@@ -22,7 +26,21 @@ async function request<T>(path: string, init?: RequestInit, auth = false): Promi
     const t = token.get();
     if (t) headers['authorization'] = `Bearer ${t}`;
   }
-  const res = await fetch(`${API_URL}${path}`, { ...init, headers });
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, { ...init, headers, signal: controller.signal });
+  } catch (e) {
+    if (e instanceof Error && e.name === 'AbortError') {
+      throw new Error(`タイムアウトしました(${REQUEST_TIMEOUT_MS / 1000}秒)。通信環境を確認してください`);
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     const detail = (body as { detail?: unknown }).detail;
@@ -67,6 +85,7 @@ export const api = {
   uploadPhoto: (
     albumId: string,
     asset: { uri: string; fileName?: string | null; mimeType?: string | null },
+    filterPreset?: string,
   ) => {
     const form = new FormData();
     form.append('file', {
@@ -74,6 +93,10 @@ export const api = {
       name: asset.fileName ?? `photo-${Date.now()}.jpg`,
       type: asset.mimeType ?? 'image/jpeg',
     } as unknown as Blob);
+    // 省略時はサーバー側の既定プリセットで焼き込まれる
+    if (filterPreset) form.append('filter_preset', filterPreset);
     return request<Photo>(`/albums/${albumId}/photos`, { method: 'POST', body: form }, true);
   },
+
+  listFilters: () => request<FiltersResponse>('/filters', undefined, true),
 };

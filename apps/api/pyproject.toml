@@ -13,6 +13,9 @@ dependencies = [
     "alembic>=1.14.0",
     "httpx>=0.28.1",
     "python-multipart>=0.0.29",
+    "pillow>=11.0.0",
+    "pillow-heif>=0.18.0",
+    "numpy>=2.1.0",
 ]
 
 [dependency-groups]

@@ -1,15 +1,49 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, SafeAreaView,
-  ScrollView, Animated, Dimensions, Image, ActivityIndicator, Alert,
+  ScrollView, Animated, Dimensions, Image, ActivityIndicator, Alert, Modal,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { api } from '../lib/api';
-import type { Album, Photo } from '../lib/types';
+import type { Album, FilterPreset, Photo } from '../lib/types';
 import { PhotoSelectScreen } from './PhotoSelectScreen';
 import { ShakeRevealScreen } from './ShakeRevealScreen';
 import { SlideshowScreen } from './SlideshowScreen';
+
+// 送信前に端末側で長辺をこのサイズに収める。フル解像度のままだと端末→サーバーの
+// WiFi転送が重くアップロードが遅い(サーバー処理自体は約1秒)。表示版は1280pxなので
+// 2048pxあれば焼き直しにも十分で、実用上の劣化なく転送量を大幅に削減できる。
+const MAX_UPLOAD_EDGE = 2048;
+
+async function downscaleForUpload(
+  asset: ImagePicker.ImagePickerAsset,
+): Promise<{ uri: string; fileName?: string | null; mimeType?: string | null }> {
+  const longEdge = Math.max(asset.width ?? 0, asset.height ?? 0);
+  // 既に十分小さい / サイズ不明ならそのまま送る
+  if (!longEdge || longEdge <= MAX_UPLOAD_EDGE) return asset;
+  try {
+    const isLandscape = (asset.width ?? 0) >= (asset.height ?? 0);
+    const ctx = ImageManipulator.manipulate(asset.uri);
+    ctx.resize(isLandscape ? { width: MAX_UPLOAD_EDGE } : { height: MAX_UPLOAD_EDGE });
+    const ref = await ctx.renderAsync();
+    const result = await ref.saveAsync({ compress: 0.8, format: SaveFormat.JPEG });
+    return { uri: result.uri, fileName: asset.fileName ?? 'photo.jpg', mimeType: 'image/jpeg' };
+  } catch {
+    // 失敗時は元画像でアップロード(遅くなるが送れる方を優先)
+    return asset;
+  }
+}
+
+// プリセットの色行列(Skia互換4x5)を中間グレーに適用し、フィルターの色味を表す
+// スウォッチ色を算出する。クライアント側のプレビュー無し(Phase A)でも色の方向が伝わる。
+function swatchColor(cm: number[]): string {
+  const g = 0.5; // 中間グレー
+  const ch = (r: number) =>
+    Math.round(Math.max(0, Math.min(1, cm[r * 5] * g + cm[r * 5 + 1] * g + cm[r * 5 + 2] * g + cm[r * 5 + 4])) * 255);
+  return `rgb(${ch(0)}, ${ch(1)}, ${ch(2)})`;
+}
 
 const C = {
   bg: '#E8D5B0', card: '#F8F0DC', dark: '#1C1208',
@@ -151,6 +185,12 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
   const [photoSelectVisible, setPhotoSelectVisible] = useState(false);
   const [slideshowPhotos, setSlideshowPhotos] = useState<Photo[]>([]);
   const [slideshowVisible, setSlideshowVisible] = useState(false);
+  const [filters, setFilters] = useState<FilterPreset[]>([]);
+  const [defaultPreset, setDefaultPreset] = useState('classic-film');
+  // 撮影/選択済みでフィルター選択待ちの画像
+  const [pendingAsset, setPendingAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  // モーダルで選択中のフィルター(確認ボタンを押すまで確定しない)
+  const [selectedPreset, setSelectedPreset] = useState('classic-film');
   // null = 確認中, false = 未開封（シェイク演出を表示）, true = 開封済み
   const [revealed, setRevealed] = useState<boolean | null>(isSealed ? true : null);
 
@@ -173,7 +213,22 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
       .finally(() => setLoadingPhotos(false));
   }, [album.id, isSealed]);
 
-  async function pickAndUpload(source: 'camera' | 'library') {
+  // フィルタープリセット定義を取得(サーバーと共通の真実の源)
+  useEffect(() => {
+    api
+      .listFilters()
+      .then(res => {
+        setFilters(res.presets.filter(p => p.id !== 'none'));
+        setDefaultPreset(res.default_preset);
+      })
+      .catch(() => {
+        // 取得失敗時は既定プリセットのみで継続できるようにする
+        setFilters([]);
+      });
+  }, []);
+
+  // 撮影/選択した画像を保持し、フィルター選択モーダルを開く
+  async function pickImage(source: 'camera' | 'library') {
     const perm =
       source === 'camera'
         ? await ImagePicker.requestCameraPermissionsAsync()
@@ -193,9 +248,28 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
         : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.6 });
     if (result.canceled) return;
 
+    setSelectedPreset(defaultPreset);
+    setPendingAsset(result.assets[0]);
+  }
+
+  // 「このフィルターで保存」押下時に確認ダイアログを挟む
+  function requestSaveConfirmation() {
+    const name = filters.find(f => f.id === selectedPreset)?.name ?? 'このフィルター';
+    Alert.alert('保存の確認', `「${name}」で保存しますか？`, [
+      { text: 'キャンセル', style: 'cancel' },
+      { text: '保存する', onPress: () => confirmUpload(selectedPreset) },
+    ]);
+  }
+
+  // 選んだフィルターで焼き込みアップロード
+  async function confirmUpload(presetId: string) {
+    if (!pendingAsset) return;
+    const asset = pendingAsset;
+    setPendingAsset(null);
     setUploading(true);
     try {
-      const photo = await api.uploadPhoto(album.id, result.assets[0]);
+      const upload = await downscaleForUpload(asset);
+      const photo = await api.uploadPhoto(album.id, upload, presetId);
       setCount(c => c + 1);
       if (!isSealed) setPhotos(prev => [...prev, photo]);
       Alert.alert('保存しました', '写真をアルバムに追加しました');
@@ -212,8 +286,8 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
       return;
     }
     Alert.alert('写真を追加', album.title, [
-      { text: 'カメラで撮影', onPress: () => pickAndUpload('camera') },
-      { text: 'ライブラリから選択', onPress: () => pickAndUpload('library') },
+      { text: 'カメラで撮影', onPress: () => pickImage('camera') },
+      { text: 'ライブラリから選択', onPress: () => pickImage('library') },
       { text: 'キャンセル', style: 'cancel' },
     ]);
   }
@@ -259,6 +333,64 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
           <Text style={s.uploadText}>アップロード中...</Text>
         </View>
       )}
+
+      <Modal
+        visible={pendingAsset !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPendingAsset(null)}
+      >
+        <View style={s.filterBackdrop}>
+          <View style={s.filterSheet}>
+            <Text style={s.filterTitle}>フィルターを選ぶ</Text>
+            <Text style={s.filterHint}>現像日に、選んだフィルムで焼き上がります</Text>
+
+            {pendingAsset && (
+              <Image source={{ uri: pendingAsset.uri }} style={s.filterPreviewImg} resizeMode="cover" />
+            )}
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={s.filterRow}
+            >
+              {(filters.length ? filters : [{ id: defaultPreset, name: 'フィルム', description: '', color_matrix: [], vignette: { intensity: 0, radius: 1 }, grain: { amount: 0 } }]).map(f => {
+                const selected = f.id === selectedPreset;
+                return (
+                  <TouchableOpacity
+                    key={f.id}
+                    style={s.filterChip}
+                    onPress={() => setSelectedPreset(f.id)}
+                    activeOpacity={0.8}
+                  >
+                    <View
+                      style={[
+                        s.filterSwatch,
+                        selected && s.filterSwatchSelected,
+                        { backgroundColor: f.color_matrix.length ? swatchColor(f.color_matrix) : C.muted },
+                      ]}
+                    />
+                    <Text style={[s.filterChipText, selected && s.filterChipTextSelected]} numberOfLines={1}>
+                      {f.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={s.filterConfirm}
+              onPress={requestSaveConfirmation}
+              activeOpacity={0.85}
+            >
+              <Text style={s.filterConfirmText}>このフィルターで保存</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.filterCancel} onPress={() => setPendingAsset(null)}>
+              <Text style={s.filterCancelText}>キャンセル</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <SlideshowScreen
         photos={slideshowPhotos}
@@ -397,4 +529,44 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   uploadText: { color: '#F5EDD8', fontSize: 14, marginTop: 12, letterSpacing: 2 },
+
+  // フィルター選択モーダル
+  filterBackdrop: {
+    flex: 1, justifyContent: 'flex-end',
+    backgroundColor: 'rgba(14,10,4,0.7)',
+  },
+  filterSheet: {
+    backgroundColor: C.card,
+    borderTopLeftRadius: 16, borderTopRightRadius: 16,
+    paddingHorizontal: 20, paddingTop: 20, paddingBottom: 32,
+    borderTopWidth: 1.5, borderTopColor: C.dark,
+  },
+  filterTitle: { fontSize: 18, fontWeight: '800', color: C.dark, textAlign: 'center' },
+  filterHint: { fontSize: 12, color: C.muted, textAlign: 'center', marginTop: 4 },
+  filterPreviewImg: {
+    width: '100%', aspectRatio: 4 / 3,
+    borderRadius: 6, marginTop: 16, marginBottom: 8,
+    backgroundColor: C.dark,
+  },
+  filterRow: { gap: 16, paddingVertical: 12, paddingHorizontal: 4 },
+  filterChip: { alignItems: 'center', width: 64 },
+  filterSwatch: {
+    width: 52, height: 52, borderRadius: 26,
+    borderWidth: 2, borderColor: C.dark,
+  },
+  filterSwatchSelected: {
+    borderWidth: 3, borderColor: C.red,
+    transform: [{ scale: 1.1 }],
+  },
+  filterChipText: { fontSize: 11, color: C.muted, marginTop: 6, fontWeight: '600' },
+  filterChipTextSelected: { color: C.dark, fontWeight: '800' },
+  filterConfirm: {
+    marginTop: 8, paddingVertical: 14, alignItems: 'center',
+    backgroundColor: C.dark, borderRadius: 6,
+  },
+  filterConfirmText: { fontSize: 15, color: '#F5EDD8', fontWeight: '700', letterSpacing: 1 },
+  filterCancel: {
+    marginTop: 10, paddingVertical: 12, alignItems: 'center',
+  },
+  filterCancelText: { fontSize: 14, color: C.muted, fontWeight: '600' },
 });
