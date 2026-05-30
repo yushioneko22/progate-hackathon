@@ -31,12 +31,14 @@ class AlbumRepository:
         created_by: uuid.UUID,
         reveal_date: date,
         max_exposures: int,
+        bgm_url: str | None = None,
     ) -> Album:
         album = Album(
             title=title,
             created_by=created_by,
             reveal_date=reveal_date,
             max_exposures=max_exposures,
+            bgm_url=bgm_url,
         )
         self._session.add(album)
         await self._session.flush()

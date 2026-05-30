@@ -17,6 +17,7 @@ class Album(Base):
     )
     reveal_date: Mapped[date] = mapped_column(Date, nullable=False)
     max_exposures: Mapped[int] = mapped_column(Integer, nullable=False, default=27)
+    bgm_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

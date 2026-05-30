@@ -51,7 +51,7 @@ export const api = {
     }),
 
   listAlbums: () => request<Album[]>('/albums', undefined, true),
-  createAlbum: (data: { title: string; reveal_date: string; max_exposures: number }) =>
+  createAlbum: (data: { title: string; reveal_date: string; max_exposures: number; bgm_url?: string }) =>
     request<Album>('/albums', { method: 'POST', body: JSON.stringify(data) }, true),
 
   listPhotos: (albumId: string) =>
