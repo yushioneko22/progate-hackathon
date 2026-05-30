@@ -19,6 +19,7 @@ export type Album = {
   title: string;
   reveal_date: string;
   max_exposures: number;
+  bgm_url: string | null;
   status: 'sealed' | 'opened';
   days_left: number | null;
   member_count: number;

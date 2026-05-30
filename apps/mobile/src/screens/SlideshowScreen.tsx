@@ -22,11 +22,12 @@ const C = {
 type Props = {
   photos: Photo[];
   albumTitle: string;
+  bgmUrl?: string | null;
   visible: boolean;
   onClose: () => void;
 };
 
-export function SlideshowScreen({ photos, albumTitle, visible, onClose }: Props) {
+export function SlideshowScreen({ photos, albumTitle, bgmUrl, visible, onClose }: Props) {
   // Which photo index is loaded in each layer
   const [layer0Photo, setLayer0Photo] = useState(0);
   const [layer1Photo, setLayer1Photo] = useState(photos.length > 1 ? 1 : 0);
@@ -78,7 +79,6 @@ export function SlideshowScreen({ photos, albumTitle, visible, onClose }: Props)
       return;
     }
 
-    const bgmUrl = process.env.EXPO_PUBLIC_BGM_URL;
     if (!bgmUrl) return;
 
     let sound: Audio.Sound | null = null;

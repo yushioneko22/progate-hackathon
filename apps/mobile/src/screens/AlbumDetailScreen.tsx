@@ -227,6 +227,7 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
       <SlideshowScreen
         photos={photos}
         albumTitle={album.title}
+        bgmUrl={album.bgm_url}
         visible={slideshowVisible}
         onClose={() => setSlideshowVisible(false)}
       />

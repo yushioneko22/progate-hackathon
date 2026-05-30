@@ -23,6 +23,7 @@ class AlbumService:
             created_by=creator_id,
             reveal_date=payload.reveal_date,
             max_exposures=payload.max_exposures,
+            bgm_url=payload.bgm_url,
         )
         await self._repo.add_member(
             album_id=album.id, user_id=creator_id, role="owner"
@@ -43,6 +44,7 @@ class AlbumService:
             title=album.title,
             reveal_date=album.reveal_date,
             max_exposures=album.max_exposures,
+            bgm_url=album.bgm_url,
             status="opened" if is_opened else "sealed",
             days_left=None if is_opened else (album.reveal_date - today).days,
             member_count=len(album.members),

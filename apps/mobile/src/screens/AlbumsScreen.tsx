@@ -66,6 +66,7 @@ function CreateModal({
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
   const [expIdx, setExpIdx] = useState(2);
+  const [bgmUrl, setBgmUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -107,7 +108,7 @@ function CreateModal({
     })
   ).current;
 
-  function reset() { setTitle(''); setDate(''); setExpIdx(2); setError(''); }
+  function reset() { setTitle(''); setDate(''); setExpIdx(2); setBgmUrl(''); setError(''); }
 
   async function handleCreate() {
     if (!title.trim()) { setError('タイトルを入力してください'); return; }
@@ -119,6 +120,7 @@ function CreateModal({
         title: title.trim(),
         reveal_date: date,
         max_exposures: EXP_OPTIONS[expIdx],
+        ...(bgmUrl.trim() ? { bgm_url: bgmUrl.trim() } : {}),
       });
       onCreated(album);
       reset();
@@ -168,6 +170,19 @@ function CreateModal({
                   placeholder="2025-08-31"
                   placeholderTextColor={C.muted}
                   keyboardType="numbers-and-punctuation"
+                />
+              </View>
+
+              <View style={s.field}>
+                <Text style={s.label}>BGM URL（任意）</Text>
+                <TextInput
+                  style={s.input}
+                  value={bgmUrl}
+                  onChangeText={setBgmUrl}
+                  placeholder="https://example.com/bgm.mp3"
+                  placeholderTextColor={C.muted}
+                  autoCapitalize="none"
+                  keyboardType="url"
                 />
               </View>
 
