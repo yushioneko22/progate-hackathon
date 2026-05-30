@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import { token } from './token';
-import type { Album, FiltersResponse, Photo, Todo, TokenResponse } from './types';
+import type { Album, FiltersResponse, Movie, Photo, Todo, TokenResponse } from './types';
 
 function resolveApiUrl(): string {
   const fromEnv = process.env.EXPO_PUBLIC_API_URL;
@@ -104,4 +104,11 @@ export const api = {
   },
 
   listFilters: () => request<FiltersResponse>('/filters', undefined, true),
+
+  // スライドショー動画(MP4)の生成を開始する(非同期)。pending のジョブが返る。
+  requestMovie: (albumId: string) =>
+    request<Movie>(`/albums/${albumId}/movie`, { method: 'POST' }, true),
+  // 最新の動画生成ジョブの状態を取得する(ポーリング用)。
+  getMovie: (albumId: string) =>
+    request<Movie>(`/albums/${albumId}/movie`, undefined, true),
 };

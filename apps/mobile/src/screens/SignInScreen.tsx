@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  SafeAreaView, ScrollView, ActivityIndicator,
+  SafeAreaView, ScrollView, ActivityIndicator, Platform,
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
@@ -17,6 +17,19 @@ const C = {
   muted: '#8A7A64', red: '#B8291C', border: '#D4C4A0',
 };
 
+// expo-auth-session の Google は プラットフォーム固定でクライアントIDを選ぶ
+// (iOS→iosClientId / Android→androidClientId / web→webClientId)。
+// その値が無い環境(例: Expo Go の iOS で iosClientId 未設定)では
+// useIdTokenAuthRequest が描画時に例外を投げるため、ボタンごと出さない。
+// ネイティブの Google ログインは Expo Go では完結できず dev build が必要。
+const GOOGLE_CLIENT_ID =
+  Platform.OS === 'ios'
+    ? process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID
+    : Platform.OS === 'android'
+      ? process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID
+      : process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+const GOOGLE_ENABLED = !!GOOGLE_CLIENT_ID;
+
 type Tab = 'login' | 'register';
 
 export function SignInScreen({ onNavigate }: { onNavigate: (s: Screen) => void }) {
@@ -26,32 +39,6 @@ export function SignInScreen({ onNavigate }: { onNavigate: (s: Screen) => void }
   const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-
-  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
-    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
-    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-  });
-
-  // Google 認証が成功したら id_token をバックエンドへ送り、自前の JWT を受け取る。
-  useEffect(() => {
-    if (response?.type !== 'success') return;
-    const idToken = response.params.id_token;
-    if (!idToken) {
-      setError('Google ログインに失敗しました');
-      return;
-    }
-    setError('');
-    setLoading(true);
-    api
-      .googleLogin(idToken)
-      .then((res) => {
-        token.set(res.token);
-        onNavigate('albums');
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : 'エラーが発生しました'))
-      .finally(() => setLoading(false));
-  }, [response, onNavigate]);
 
   async function handleSubmit() {
     setError('');
@@ -149,24 +136,76 @@ export function SignInScreen({ onNavigate }: { onNavigate: (s: Screen) => void }
             }
           </TouchableOpacity>
 
-          <View style={s.divider}>
-            <View style={s.dividerLine} />
-            <Text style={s.dividerText}>または</Text>
-            <View style={s.dividerLine} />
-          </View>
-
-          <TouchableOpacity
-            style={[s.googleBtn, (!request || loading) && s.btnDisabled]}
-            onPress={() => { setError(''); void promptAsync(); }}
-            disabled={!request || loading}
-            activeOpacity={0.8}
-          >
-            <Text style={s.googleG}>G</Text>
-            <Text style={s.googleText}>Google でログイン</Text>
-          </TouchableOpacity>
+          {GOOGLE_ENABLED && (
+            <>
+              <View style={s.divider}>
+                <View style={s.dividerLine} />
+                <Text style={s.dividerText}>または</Text>
+                <View style={s.dividerLine} />
+              </View>
+              <GoogleSignInButton
+                loading={loading}
+                setLoading={setLoading}
+                setError={setError}
+                onSuccess={() => onNavigate('albums')}
+              />
+            </>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+// Google ログインボタン。GOOGLE_ENABLED の時だけマウントされるため、
+// ここで useIdTokenAuthRequest が例外を投げることはない。
+function GoogleSignInButton({
+  loading,
+  setLoading,
+  setError,
+  onSuccess,
+}: {
+  loading: boolean;
+  setLoading: (v: boolean) => void;
+  setError: (v: string) => void;
+  onSuccess: () => void;
+}) {
+  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
+    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+  });
+
+  // Google 認証が成功したら id_token をバックエンドへ送り、自前の JWT を受け取る。
+  useEffect(() => {
+    if (response?.type !== 'success') return;
+    const idToken = response.params.id_token;
+    if (!idToken) {
+      setError('Google ログインに失敗しました');
+      return;
+    }
+    setError('');
+    setLoading(true);
+    api
+      .googleLogin(idToken)
+      .then((res) => {
+        token.set(res.token);
+        onSuccess();
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : 'エラーが発生しました'))
+      .finally(() => setLoading(false));
+  }, [response, setError, setLoading, onSuccess]);
+
+  return (
+    <TouchableOpacity
+      style={[s.googleBtn, (!request || loading) && s.btnDisabled]}
+      onPress={() => { setError(''); void promptAsync(); }}
+      disabled={!request || loading}
+      activeOpacity={0.8}
+    >
+      <Text style={s.googleG}>G</Text>
+      <Text style={s.googleText}>Google でログイン</Text>
+    </TouchableOpacity>
   );
 }
 

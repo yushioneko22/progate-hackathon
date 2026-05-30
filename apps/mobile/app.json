@@ -5,11 +5,16 @@
     "version": "0.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
-    "scheme": "kawarun",
+    "scheme": ["kawarun", "com.progatehackathon.todo"],
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.progatehackathon.todo"
+      "bundleIdentifier": "com.progatehackathon.todo",
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        }
+      }
     },
     "android": {
       "package": "com.progatehackathon.todo"

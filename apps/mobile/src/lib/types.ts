@@ -57,3 +57,14 @@ export type FiltersResponse = {
   default_preset: string;
   realtime_preview_enabled: boolean;
 };
+
+// 写真から生成するスライドショー動画(MP4)の生成ジョブ。
+export type Movie = {
+  id: string;
+  album_id: string;
+  status: 'pending' | 'processing' | 'ready' | 'failed';
+  url: string | null;  // ready のときのみ動画の公開URL
+  error: string | null;
+  created_at: string;
+  updated_at: string;
+};
