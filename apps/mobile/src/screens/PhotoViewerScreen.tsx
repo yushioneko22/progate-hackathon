@@ -105,7 +105,7 @@ export function PhotoViewerScreen({ photos, initialIndex, origin, visible, onClo
   // スワイプ（左右両方向）
   const swipeX = useRef(new Animated.Value(0)).current;
   const panResponder = useRef(PanResponder.create({
-    onStartShouldSetPanResponder: () => false,
+    onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: (_, g) =>
       Math.abs(g.dx) > 6 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
     onPanResponderMove: (_, g) => swipeX.setValue(g.dx),
@@ -137,7 +137,7 @@ export function PhotoViewerScreen({ photos, initialIndex, origin, visible, onClo
   }
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+    <View style={StyleSheet.absoluteFill}>
 
       {/* ヘッダー（✕ + カウンター） */}
       <Animated.View style={[s.header, { opacity: headerOp }]}>
