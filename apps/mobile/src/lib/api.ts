@@ -25,7 +25,15 @@ async function request<T>(path: string, init?: RequestInit, auth = false): Promi
   const res = await fetch(`${API_URL}${path}`, { ...init, headers });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error((body as { detail?: string }).detail ?? `API ${res.status}`);
+    const detail = (body as { detail?: unknown }).detail;
+    const msg =
+      typeof detail === 'string' ? detail :
+      Array.isArray(detail)
+        ? (detail as Array<{ msg?: string; loc?: string[] }>)
+            .map(d => d.msg ?? JSON.stringify(d))
+            .join(' / ')
+        : `API ${res.status}`;
+    throw new Error(msg);
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
