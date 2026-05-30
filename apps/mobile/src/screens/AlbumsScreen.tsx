@@ -158,8 +158,7 @@ function CreateModal({
     try {
       const album = await api.createAlbum({
         title: title.trim(),
-        // TODO: remove split once PR #7 is merged and deployed
-        reveal_date: revealAt.toISOString().split('T')[0],
+        reveal_date: revealAt.toISOString(),
         max_exposures: EXP_OPTIONS[expIdx],
         ...(bgmUrl.trim() ? { bgm_url: bgmUrl.trim() } : {}),
       });
