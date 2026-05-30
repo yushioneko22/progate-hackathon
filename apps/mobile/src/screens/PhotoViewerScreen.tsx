@@ -14,12 +14,13 @@ const FAN_H    = CARD_H + FAN_BOT + 16;
 const PHOTO_H  = SH - HEADER_H - FAN_H;
 const PHOTO_CY = HEADER_H + PHOTO_H / 2;
 
-// 元のポラロイドと同じ縁の比率を全画面で再現
-// original: width=(SW-64)/2, padding=8, paddingBottom=28
-const POLAROID_W   = (SW - 64) / 2;
-const FRAME_SCALE  = SW / POLAROID_W;          // 全画面への倍率
-const FRAME_SIDE   = Math.round(8  * FRAME_SCALE); // 左右・上の縁
-const FRAME_BOTTOM = Math.round(28 * FRAME_SCALE); // 下の白い余白
+// カード左右のマージン（画面端まで広げない）
+const CARD_MARGIN  = 24;
+const CARD_WIDTH   = SW - CARD_MARGIN * 2;
+
+// 元のポラロイドと同じ縁の絶対値を使用（比例拡大すると太く見えるため）
+const FRAME_SIDE   = 8;
+const FRAME_BOTTOM = 28;
 const FAN_STEP = 3;
 const ROT_DEG  = 11;
 const PIVOT    = CARD_H / 2;
@@ -97,6 +98,7 @@ export function PhotoViewerScreen({ photos, initialIndex, origin, visible, onClo
       Animated.spring(photoScale, { toValue: startScale, useNativeDriver: true, tension: 130, friction: 10 }),
       Animated.spring(photoTX,    { toValue: tx, useNativeDriver: true, tension: 130, friction: 10 }),
       Animated.spring(photoTY,    { toValue: ty, useNativeDriver: true, tension: 130, friction: 10 }),
+      Animated.timing(photoOp,    { toValue: 0, duration: 180, useNativeDriver: true }),
       Animated.timing(headerOp,   { toValue: 0, duration: 180, useNativeDriver: true }),
       Animated.timing(fanSlideY,  { toValue: FAN_H + 20, duration: 180, useNativeDriver: true }),
     ]).start(() => onClose());
@@ -244,9 +246,10 @@ const s = StyleSheet.create({
   },
   // ポラロイド風カード：元の polaroid と同じ縁の比率で全画面に拡大
   photoCard: {
-    width: SW,
+    width: CARD_WIDTH,
     height: PHOTO_H,
     backgroundColor: '#F8F0DC',
+    borderRadius: 8,
     padding: FRAME_SIDE,
     paddingBottom: FRAME_BOTTOM,
     shadowColor: '#1C1208',
