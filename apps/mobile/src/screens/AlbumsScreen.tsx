@@ -158,7 +158,7 @@ function CreateModal({
     try {
       const album = await api.createAlbum({
         title: title.trim(),
-        // TODO: remove split once backend is deployed with datetime support (PR #7)
+        // TODO: remove split once PR #7 is merged and deployed
         reveal_date: revealAt.toISOString().split('T')[0],
         max_exposures: EXP_OPTIONS[expIdx],
         ...(bgmUrl.trim() ? { bgm_url: bgmUrl.trim() } : {}),
@@ -205,17 +205,19 @@ function CreateModal({
               <View style={s.field}>
                 <Text style={s.label}>現像日時</Text>
 
-                {/* iOS: compact picker をそのまま表示 */}
+                {/* iOS: compact — タップするとシステムのポップオーバーが開く */}
                 {Platform.OS === 'ios' && (
-                  <View style={s.iosPickerWrap}>
+                  <View style={s.iosPickerRow}>
+                    <Text style={s.iosPickerLabel}>{formatRevealAt(revealAt)}</Text>
                     <DateTimePicker
                       value={revealAt}
                       mode="datetime"
-                      display="inline"
-                      minimumDate={new Date()}
+                      display="compact"
+                      minimumDate={(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })()}
                       locale="ja-JP"
-                      onChange={(_, d) => { if (d) setRevealAt(d); }}
-                      style={s.iosPicker}
+                      onChange={(event, d) => {
+                        if (event.type === 'set' && d) setRevealAt(new Date(d));
+                      }}
                     />
                   </View>
                 )}
@@ -430,12 +432,17 @@ const s = StyleSheet.create({
 
   error: { color: C.red, fontSize: 13, marginBottom: 8 },
 
-  iosPickerWrap: {
-    backgroundColor: C.card,
+  iosPickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     borderWidth: 1.5, borderColor: C.border,
-    borderRadius: 4, overflow: 'hidden',
+    backgroundColor: '#fff',
+    paddingHorizontal: 14, paddingVertical: 10,
   },
-  iosPicker: { height: 380 },
+  iosPickerLabel: {
+    fontSize: 14, color: C.dark, flex: 1,
+  },
 
   dateBtn: {
     borderWidth: 1.5, borderColor: C.border, backgroundColor: '#fff',
