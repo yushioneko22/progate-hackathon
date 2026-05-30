@@ -18,9 +18,11 @@ from app.filters.presets import FilterPreset, Grain, Vignette
 # iOS のカメラ画像 (HEIC/HEIF) を Pillow で開けるようにする
 register_heif_opener()
 
-# 処理コストとレスポンスを安定させるため長辺をこのサイズに収める
-_MAX_EDGE = 1600
-_JPEG_QUALITY = 88
+# 表示用(加工版)の長辺サイズと品質。スマホ表示に十分な範囲でファイルを小さく保ち、
+# アップロードとギャラリー表示を軽くする(原本はフル解像度で別途保持している)。
+# グレインがJPEG圧縮を妨げるため、解像度を抑えるのがサイズ削減に最も効く。
+_MAX_EDGE = 1280
+_JPEG_QUALITY = 82
 
 
 def apply_preset(*, data: bytes, preset: FilterPreset) -> bytes:

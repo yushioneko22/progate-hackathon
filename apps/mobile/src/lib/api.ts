@@ -11,6 +11,10 @@ function resolveApiUrl(): string {
 
 const API_URL = resolveApiUrl();
 
+// リクエストのタイムアウト(ms)。fetch は標準でタイムアウトしないため、
+// AbortController で打ち切って UI がハングしないようにする。
+const REQUEST_TIMEOUT_MS = 30_000;
+
 async function request<T>(path: string, init?: RequestInit, auth = false): Promise<T> {
   // FormData の場合は content-type を指定しない(fetch が boundary 付きで自動設定する)
   const isForm = typeof FormData !== 'undefined' && init?.body instanceof FormData;
@@ -22,7 +26,21 @@ async function request<T>(path: string, init?: RequestInit, auth = false): Promi
     const t = token.get();
     if (t) headers['authorization'] = `Bearer ${t}`;
   }
-  const res = await fetch(`${API_URL}${path}`, { ...init, headers });
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, { ...init, headers, signal: controller.signal });
+  } catch (e) {
+    if (e instanceof Error && e.name === 'AbortError') {
+      throw new Error(`タイムアウトしました(${REQUEST_TIMEOUT_MS / 1000}秒)。通信環境を確認してください`);
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error((body as { detail?: string }).detail ?? `API ${res.status}`);

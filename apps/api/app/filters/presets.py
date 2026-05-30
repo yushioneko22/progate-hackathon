@@ -71,6 +71,36 @@ PRESETS: dict[str, FilterPreset] = {
         "vignette": {"intensity": 0.55, "radius": 0.6},
         "grain": {"amount": 0.085},
     },
+    # モノクロフィルム。輝度変換(0.299/0.587/0.114)でグレースケール化し、
+    # 強めのグレインと周辺減光で白黒フィルムの質感を出す。
+    "monochrome": {
+        "id": "monochrome",
+        "name": "モノクロ",
+        "description": "白黒フィルム調(強めの粒状とコントラスト)",
+        "color_matrix": [
+            0.299, 0.587, 0.114, 0, 0.03,
+            0.299, 0.587, 0.114, 0, 0.03,
+            0.299, 0.587, 0.114, 0, 0.04,
+            0.000, 0.000, 0.000, 1, 0.00,
+        ],
+        "vignette": {"intensity": 0.6, "radius": 0.55},
+        "grain": {"amount": 0.11},
+    },
+    # クールな色あせフィルム。青を持ち上げ、影に青みのオフセットを乗せて
+    # 暖色のclassic-filmとは逆方向の落ち着いたトーンにする。
+    "retro-cool": {
+        "id": "retro-cool",
+        "name": "レトロクール",
+        "description": "青みがかった色あせフィルム調",
+        "color_matrix": [
+            0.90, 0.00, 0.05, 0, 0.02,
+            0.03, 0.98, 0.03, 0, 0.04,
+            0.03, 0.06, 1.12, 0, 0.07,
+            0.00, 0.00, 0.00, 1, 0.00,
+        ],
+        "vignette": {"intensity": 0.5, "radius": 0.62},
+        "grain": {"amount": 0.07},
+    },
 }
 
 DEFAULT_PRESET = "classic-film"

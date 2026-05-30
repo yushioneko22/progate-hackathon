@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 
 import httpx
@@ -37,19 +38,22 @@ class PhotoService:
             raise HTTPException(status.HTTP_409_CONFLICT, detail="フィルムを使い切りました")
 
         # フィルターを焼き込む。原本も保持してリバーシブルにする(後から焼き直せる)。
+        # 画像処理はCPUバウンドなので別スレッドに逃がし、イベントループを塞がない。
         preset = presets.get_preset(filter_preset)
         try:
-            filtered = engine.apply_preset(data=data, preset=preset)
+            filtered = await asyncio.to_thread(engine.apply_preset, data=data, preset=preset)
         except Exception:  # noqa: BLE001 - 破損画像など。原本でフォールバック。
             filtered, preset = None, presets.get_preset("none")
 
+        # 原本と加工版を並列でアップロード(順次だと2回分の往復になり遅い)。
         try:
-            original_key = await storage.upload_photo(data=data, content_type=content_type)
             if filtered is None:
+                original_key = await storage.upload_photo(data=data, content_type=content_type)
                 display_key = original_key
             else:
-                display_key = await storage.upload_photo(
-                    data=filtered, content_type="image/jpeg"
+                original_key, display_key = await asyncio.gather(
+                    storage.upload_photo(data=data, content_type=content_type),
+                    storage.upload_photo(data=filtered, content_type="image/jpeg"),
                 )
         except httpx.HTTPError as err:
             raise HTTPException(
