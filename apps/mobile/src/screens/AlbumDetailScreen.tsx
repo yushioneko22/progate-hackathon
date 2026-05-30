@@ -59,10 +59,22 @@ function formatRevealDate(isoString: string): string {
   return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（${DOW[d.getDay()]}）${h}:${m}`;
 }
 
+function calcCountdown(revealDate: string): { value: string; unit: string; isClose: boolean } {
+  const diff = Math.max(0, new Date(revealDate).getTime() - Date.now());
+  const totalSecs = Math.floor(diff / 1000);
+  const days = Math.floor(totalSecs / 86400);
+  if (days >= 1) return { value: String(days), unit: '日', isClose: false };
+  const hh = Math.floor(totalSecs / 3600).toString().padStart(2, '0');
+  const mm = Math.floor((totalSecs % 3600) / 60).toString().padStart(2, '0');
+  const ss = (totalSecs % 60).toString().padStart(2, '0');
+  return { value: `${hh}:${mm}:${ss}`, unit: '', isClose: true };
+}
+
 const { width: SW } = Dimensions.get('window');
 
 function SealedView({ album, count }: { album: Album; count: number }) {
   const pulse = useRef(new Animated.Value(1)).current;
+  const [countdown, setCountdown] = useState(() => calcCountdown(album.reveal_date));
 
   useEffect(() => {
     Animated.loop(
@@ -73,7 +85,11 @@ function SealedView({ album, count }: { album: Album; count: number }) {
     ).start();
   }, [pulse]);
 
-  const daysLeft = album.days_left ?? 0;
+  // 1秒ごとにカウントダウンを更新
+  useEffect(() => {
+    const id = setInterval(() => setCountdown(calcCountdown(album.reveal_date)), 1000);
+    return () => clearInterval(id);
+  }, [album.reveal_date]);
 
   return (
     <View style={s.sealedContainer}>
@@ -89,8 +105,10 @@ function SealedView({ album, count }: { album: Album; count: number }) {
 
         <Animated.View style={[s.countdownBox, { transform: [{ scale: pulse }] }]}>
           <Text style={s.countdownLabel}>現 像 ま で</Text>
-          <Text style={s.countdownNum}>{daysLeft}</Text>
-          <Text style={s.countdownUnit}>日</Text>
+          <Text style={[s.countdownNum, countdown.isClose && s.countdownNumSmall]}>
+            {countdown.value}
+          </Text>
+          {countdown.unit ? <Text style={s.countdownUnit}>{countdown.unit}</Text> : null}
         </Animated.View>
 
         <View style={s.sealedBadge}>
@@ -177,7 +195,8 @@ function OpenedView({
 }
 
 export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () => void }) {
-  const isSealed = album.status === 'sealed';
+  const [localStatus, setLocalStatus] = useState<'sealed' | 'opened'>(album.status);
+  const isSealed = localStatus === 'sealed';
   const [count, setCount] = useState(album.photo_count);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loadingPhotos, setLoadingPhotos] = useState(!isSealed);
@@ -187,12 +206,19 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
   const [slideshowVisible, setSlideshowVisible] = useState(false);
   const [filters, setFilters] = useState<FilterPreset[]>([]);
   const [defaultPreset, setDefaultPreset] = useState('classic-film');
-  // 撮影/選択済みでフィルター選択待ちの画像
   const [pendingAsset, setPendingAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
-  // モーダルで選択中のフィルター(確認ボタンを押すまで確定しない)
   const [selectedPreset, setSelectedPreset] = useState('classic-film');
   // null = 確認中, false = 未開封（シェイク演出を表示）, true = 開封済み
-  const [revealed, setRevealed] = useState<boolean | null>(isSealed ? true : null);
+  const [revealed, setRevealed] = useState<boolean | null>(null);
+
+  // 現像日時になったら自動でOPENEDに切り替え
+  useEffect(() => {
+    if (album.status !== 'sealed') return;
+    const delay = new Date(album.reveal_date).getTime() - Date.now();
+    if (delay <= 0) { setLocalStatus('opened'); return; }
+    const timer = setTimeout(() => setLocalStatus('opened'), delay);
+    return () => clearTimeout(timer);
+  }, [album.id, album.status, album.reveal_date]);
 
   useEffect(() => {
     if (isSealed) return;
@@ -459,6 +485,7 @@ const s = StyleSheet.create({
   countdownBox: { alignItems: 'center' },
   countdownLabel: { fontSize: 12, letterSpacing: 4, color: 'rgba(232,213,176,0.5)', marginBottom: 8 },
   countdownNum: { fontSize: 96, fontWeight: '900', color: '#E8D5B0', lineHeight: 100 },
+  countdownNumSmall: { fontSize: 44, lineHeight: 52 }, // HH:MM:SS 表示用
   countdownUnit: { fontSize: 24, color: 'rgba(232,213,176,0.7)', marginTop: 4 },
 
   sealedBadge: {
