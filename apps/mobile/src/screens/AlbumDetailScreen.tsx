@@ -9,7 +9,7 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { api } from '../lib/api';
 import type { Album, FilterPreset, Photo } from '../lib/types';
 import { PhotoSelectScreen } from './PhotoSelectScreen';
-import { PhotoViewerScreen } from './PhotoViewerScreen';
+import { PhotoViewerScreen, type Origin } from './PhotoViewerScreen';
 import { ShakeRevealScreen } from './ShakeRevealScreen';
 import { SlideshowScreen } from './SlideshowScreen';
 
@@ -140,10 +140,11 @@ function OpenedView({
   photos: Photo[];
   loading: boolean;
   onStartSlideshow: () => void;
-  onPhotoPress: (index: number) => void;
+  onPhotoPress: (index: number, origin: Origin | null) => void;
 }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(40)).current;
+  const photoRefs = useRef<Array<View | null>>([]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -185,10 +186,22 @@ function OpenedView({
               <TouchableOpacity
                 key={p.id}
                 activeOpacity={0.85}
-                onPress={() => onPhotoPress(i)}
+                onPress={() => {
+                  const ref = photoRefs.current[i];
+                  if (ref) {
+                    ref.measure((_x, _y, w, h, px, py) =>
+                      onPhotoPress(i, { x: px, y: py, width: w, height: h })
+                    );
+                  } else {
+                    onPhotoPress(i, null);
+                  }
+                }}
                 style={[s.polaroid, { transform: [{ rotate: `${rotation}deg` }] }]}
               >
-                <View style={s.photoArea}>
+                <View
+                  ref={r => { photoRefs.current[i] = r; }}
+                  style={s.photoArea}
+                >
                   <Image source={{ uri: p.url }} style={s.photoImg} resizeMode="cover" />
                 </View>
                 <View style={s.polaroidCaption} />
@@ -213,6 +226,7 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
   const [slideshowVisible, setSlideshowVisible] = useState(false);
   const [viewerVisible, setViewerVisible] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
+  const [viewerOrigin, setViewerOrigin] = useState<Origin | null>(null);
   const [filters, setFilters] = useState<FilterPreset[]>([]);
   const [defaultPreset, setDefaultPreset] = useState('classic-film');
   const [pendingAsset, setPendingAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
@@ -359,7 +373,7 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
             photos={photos}
             loading={loadingPhotos}
             onStartSlideshow={() => setPhotoSelectVisible(true)}
-            onPhotoPress={i => { setViewerIndex(i); setViewerVisible(true); }}
+            onPhotoPress={(i, origin) => { setViewerIndex(i); setViewerOrigin(origin); setViewerVisible(true); }}
           />}
 
       {count < album.max_exposures && (
@@ -444,6 +458,7 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
       <PhotoViewerScreen
         photos={photos}
         initialIndex={viewerIndex}
+        origin={viewerOrigin}
         visible={viewerVisible}
         onClose={() => setViewerVisible(false)}
       />
