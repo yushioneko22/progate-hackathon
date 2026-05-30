@@ -20,7 +20,7 @@ class AlbumRepository:
             .options(selectinload(Album.members), selectinload(Album.photos))
             .join(AlbumMember, Album.id == AlbumMember.album_id)
             .where(AlbumMember.user_id == user_id)
-            .order_by(Album.reveal_date)
+            .order_by(Album.reveal_date.desc())
         )
         return list(result.scalars().all())
 
