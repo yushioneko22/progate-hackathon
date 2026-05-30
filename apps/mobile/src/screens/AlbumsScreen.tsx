@@ -339,11 +339,24 @@ export function AlbumsScreen({ onNavigate, onNavigateToAlbum }: { onNavigate: (s
     <SafeAreaView style={s.safe}>
       <View style={s.header}>
         <Text style={s.headerTitle}>現 像 所</Text>
-        <TouchableOpacity onPress={() => setSortOrder(o => o === 'desc' ? 'asc' : 'desc')} style={s.sortBtn}>
-          <Text style={s.sortBtnText}>{sortOrder === 'desc' ? '↓ 新しい順' : '↑ 古い順'}</Text>
-        </TouchableOpacity>
         <TouchableOpacity onPress={handleSignOut}>
           <Text style={s.signout}>ログアウト</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* ソートタブ */}
+      <View style={s.sortTabs}>
+        <TouchableOpacity
+          style={[s.sortTab, sortOrder === 'desc' && s.sortTabActive]}
+          onPress={() => setSortOrder('desc')}
+        >
+          <Text style={[s.sortTabText, sortOrder === 'desc' && s.sortTabTextActive]}>新しい順</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[s.sortTab, sortOrder === 'asc' && s.sortTabActive]}
+          onPress={() => setSortOrder('asc')}
+        >
+          <Text style={[s.sortTabText, sortOrder === 'asc' && s.sortTabTextActive]}>古い順</Text>
         </TouchableOpacity>
       </View>
 
@@ -389,8 +402,20 @@ const s = StyleSheet.create({
     borderBottomWidth: 1.5, borderBottomColor: C.dark,
   },
   headerTitle: { fontSize: 16, fontWeight: '900', color: C.dark, letterSpacing: 6 },
-  sortBtn: { paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: C.border },
-  sortBtnText: { fontSize: 11, color: C.muted, fontWeight: '600' },
+  sortTabs: {
+    flexDirection: 'row',
+    borderBottomWidth: 1.5, borderBottomColor: C.dark,
+  },
+  sortTab: {
+    flex: 1, paddingVertical: 10,
+    alignItems: 'center',
+    borderBottomWidth: 2, borderBottomColor: 'transparent',
+  },
+  sortTabActive: {
+    borderBottomColor: C.dark,
+  },
+  sortTabText: { fontSize: 12, color: C.muted, fontWeight: '600', letterSpacing: 1 },
+  sortTabTextActive: { color: C.dark },
   signout: { fontSize: 13, color: C.muted },
 
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
