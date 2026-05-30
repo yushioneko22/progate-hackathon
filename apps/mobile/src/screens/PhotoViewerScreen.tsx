@@ -111,19 +111,16 @@ export function PhotoViewerScreen({ photos, initialIndex, origin, visible, onClo
     onPanResponderMove: (_, g) => swipeX.setValue(g.dx),
     onPanResponderRelease: (_, g) => {
       const ci = currentIndexRef.current;
-      const isLeft  = g.dx < -50 || (g.dx < -10 && g.vx < -0.3);
-      const isRight = g.dx >  50 || (g.dx >  10 && g.vx >  0.3);
+      const goNext = g.dx < -50 || g.vx < -0.5;
+      const goPrev = g.dx >  50 || g.vx >  0.5;
 
-      if (isLeft && ci < photos.length - 1) {
-        // 左スワイプ → 次の写真
-        Animated.timing(swipeX, { toValue: -SW * 0.3, duration: 140, useNativeDriver: true })
-          .start(() => { swipeX.setValue(0); fadeToPhoto(ci + 1); });
-      } else if (isRight && ci > 0) {
-        // 右スワイプ → 前の写真
-        Animated.timing(swipeX, { toValue: SW * 0.3, duration: 140, useNativeDriver: true })
-          .start(() => { swipeX.setValue(0); fadeToPhoto(ci - 1); });
-      } else {
-        Animated.spring(swipeX, { toValue: 0, useNativeDriver: true, tension: 200, friction: 12 }).start();
+      // swipeX は常にリセット
+      Animated.spring(swipeX, { toValue: 0, useNativeDriver: true, tension: 200, friction: 12 }).start();
+
+      if (goNext && ci < photos.length - 1) {
+        fadeToPhoto(ci + 1);
+      } else if (goPrev && ci > 0) {
+        fadeToPhoto(ci - 1);
       }
     },
   })).current;
