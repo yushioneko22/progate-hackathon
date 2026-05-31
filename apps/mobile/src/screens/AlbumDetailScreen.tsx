@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, SafeAreaView,
-  ScrollView, Animated, Dimensions, Image, ActivityIndicator, Alert, Modal,
+  ScrollView, Animated, Dimensions, Image, ActivityIndicator, Alert, Modal, Share,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
@@ -238,6 +238,34 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
   // null = 確認中, false = 未開封（シェイク演出を表示）, true = 開封済み
   const [revealed, setRevealed] = useState<boolean | null>(null);
 
+  // メンバー招待（オーナーのみ）
+  const isOwner = album.my_role === 'owner';
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const [inviteLoading, setInviteLoading] = useState(false);
+
+  async function handleInvite() {
+    setInviteLoading(true);
+    try {
+      const invite = await api.createInvite(album.id);
+      setInviteCode(invite.code);
+    } catch (e) {
+      Alert.alert('エラー', e instanceof Error ? e.message : '招待コードの発行に失敗しました');
+    } finally {
+      setInviteLoading(false);
+    }
+  }
+
+  async function shareInvite() {
+    if (!inviteCode) return;
+    try {
+      await Share.share({
+        message: `「${album.title}」に参加しよう！\nアプリで「＋参加」から招待コードを入力：\n\n${inviteCode}`,
+      });
+    } catch {
+      // 共有シートのキャンセル等は無視
+    }
+  }
+
   // 現像日時になったら自動でOPENEDに切り替え
   useEffect(() => {
     if (album.status !== 'sealed') return;
@@ -366,6 +394,18 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
           <Text style={s.backText}>← 戻る</Text>
         </TouchableOpacity>
         <Text style={s.headerTitle} numberOfLines={1}>{album.title}</Text>
+        {isOwner && (
+          <TouchableOpacity
+            style={s.inviteBtn}
+            onPress={handleInvite}
+            disabled={inviteLoading}
+            activeOpacity={0.8}
+          >
+            {inviteLoading
+              ? <ActivityIndicator color={C.dark} size="small" />
+              : <Text style={s.inviteBtnText}>招待</Text>}
+          </TouchableOpacity>
+        )}
         <View style={[s.headerBadge, isSealed ? s.headerBadgeRed : s.headerBadgeGreen]}>
           <Text style={[s.headerBadgeText, { color: isSealed ? C.red : C.green }]}>
             {isSealed ? 'SEALED' : 'OPENED'}
@@ -483,6 +523,30 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
           />
         </View>
       )}
+
+      {/* 招待コード表示モーダル（オーナー） */}
+      <Modal
+        visible={inviteCode !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setInviteCode(null)}
+      >
+        <View style={s.inviteBackdrop}>
+          <View style={s.inviteCard}>
+            <Text style={s.inviteTitle}>招待コード</Text>
+            <Text style={s.inviteDesc}>このコードを共有して、{'\n'}メンバーに参加してもらいましょう</Text>
+            <View style={s.inviteCodeBox}>
+              <Text style={s.inviteCodeText}>{inviteCode}</Text>
+            </View>
+            <TouchableOpacity style={s.inviteShareBtn} onPress={shareInvite} activeOpacity={0.85}>
+              <Text style={s.inviteShareText}>共 有 す る</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.inviteCloseBtn} onPress={() => setInviteCode(null)}>
+              <Text style={s.inviteCloseText}>閉じる</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -502,6 +566,37 @@ const s = StyleSheet.create({
   headerBadgeRed: { borderColor: C.red },
   headerBadgeGreen: { borderColor: C.green },
   headerBadgeText: { fontSize: 10, fontWeight: '700', letterSpacing: 1.5 },
+  inviteBtn: {
+    borderWidth: 1.5, borderColor: C.dark, backgroundColor: C.dark,
+    paddingHorizontal: 10, paddingVertical: 4, minWidth: 44, alignItems: 'center',
+  },
+  inviteBtnText: { fontSize: 12, color: '#F5EDD8', fontWeight: '700', letterSpacing: 1 },
+
+  // 招待コードモーダル
+  inviteBackdrop: {
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(14,10,4,0.7)', padding: 32,
+  },
+  inviteCard: {
+    backgroundColor: C.card, padding: 28, width: '100%',
+    borderRadius: 12, alignItems: 'center',
+    borderWidth: 1.5, borderColor: C.dark,
+  },
+  inviteTitle: { fontSize: 18, fontWeight: '900', color: C.dark, letterSpacing: 2 },
+  inviteDesc: { fontSize: 13, color: C.muted, textAlign: 'center', marginTop: 8, lineHeight: 20 },
+  inviteCodeBox: {
+    marginTop: 20, marginBottom: 24,
+    borderWidth: 2, borderColor: C.dark, borderStyle: 'dashed',
+    paddingHorizontal: 24, paddingVertical: 16, backgroundColor: '#fff',
+  },
+  inviteCodeText: { fontSize: 36, fontWeight: '900', color: C.dark, letterSpacing: 8 },
+  inviteShareBtn: {
+    backgroundColor: C.dark, paddingVertical: 14, paddingHorizontal: 48,
+    alignItems: 'center', borderRadius: 6,
+  },
+  inviteShareText: { color: '#F5EDD8', fontSize: 15, fontWeight: '700', letterSpacing: 4 },
+  inviteCloseBtn: { marginTop: 12, paddingVertical: 8 },
+  inviteCloseText: { color: C.muted, fontSize: 14, fontWeight: '600' },
 
   // Sealed
   sealedContainer: { flex: 1 },

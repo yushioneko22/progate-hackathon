@@ -24,7 +24,22 @@ export type Album = {
   days_left: number | null;
   member_count: number;
   photo_count: number;
+  my_role: 'owner' | 'member' | null;
   created_at: string;
+};
+
+// 発行された招待コード。共有して相手に入力してもらう。
+export type InviteCode = {
+  code: string;
+  expires_at: string | null;
+};
+
+export type Member = {
+  user_id: string;
+  display_name: string;
+  avatar_url: string | null;
+  role: 'owner' | 'member';
+  joined_at: string;
 };
 
 export type TokenResponse = {

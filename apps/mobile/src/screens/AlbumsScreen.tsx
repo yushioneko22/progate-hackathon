@@ -292,11 +292,89 @@ function CreateModal({
   );
 }
 
+function JoinModal({
+  visible, onClose, onJoined,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onJoined: (a: Album) => void;
+}) {
+  const [code, setCode] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleJoin() {
+    const trimmed = code.trim().toUpperCase();
+    if (!trimmed) { setError('招待コードを入力してください'); return; }
+    setError('');
+    setLoading(true);
+    try {
+      const album = await api.joinAlbum(trimmed);
+      onJoined(album);
+      setCode('');
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '参加に失敗しました');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={s.modalOverlay}>
+        <TouchableOpacity style={s.modalBackdrop} onPress={onClose} activeOpacity={1} />
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <View style={s.modalSheet}>
+            <View style={s.handleArea}><View style={s.modalHandle} /></View>
+            <View style={s.modalSheetContent}>
+              <Text style={s.modalTitle}>招待コードで参加</Text>
+              <Text style={[s.label, { marginBottom: 12 }]}>
+                オーナーから受け取ったコードを入力してください
+              </Text>
+              <View style={s.field}>
+                <Text style={s.label}>招待コード</Text>
+                <TextInput
+                  style={[s.input, { letterSpacing: 4, fontSize: 20, textAlign: 'center' }]}
+                  value={code}
+                  onChangeText={t => setCode(t.toUpperCase())}
+                  placeholder="ABC123"
+                  placeholderTextColor={C.muted}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  maxLength={20}
+                />
+              </View>
+              {error !== '' && <Text style={s.error}>{error}</Text>}
+              <TouchableOpacity
+                style={[s.btn, loading && s.btnDisabled]}
+                onPress={handleJoin}
+                disabled={loading}
+                activeOpacity={0.8}
+              >
+                {loading
+                  ? <ActivityIndicator color="#F5EDD8" />
+                  : <Text style={s.btnText}>参　加</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
+  );
+}
+
 export function AlbumsScreen({ onNavigate, onNavigateToAlbum }: { onNavigate: (s: Screen) => void; onNavigateToAlbum: (a: Album) => void }) {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [showJoin, setShowJoin] = useState(false);
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+
+  // 参加で重複しないよう、既存を除いて先頭に追加する
+  const upsertAlbum = useCallback((a: Album) => {
+    setAlbums(prev => [a, ...prev.filter(p => p.id !== a.id)]);
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -339,9 +417,14 @@ export function AlbumsScreen({ onNavigate, onNavigateToAlbum }: { onNavigate: (s
     <SafeAreaView style={s.safe}>
       <View style={s.header}>
         <Text style={s.headerTitle}>現 像 所</Text>
-        <TouchableOpacity onPress={handleSignOut}>
-          <Text style={s.signout}>ログアウト</Text>
-        </TouchableOpacity>
+        <View style={s.headerActions}>
+          <TouchableOpacity onPress={() => setShowJoin(true)} style={s.joinBtn}>
+            <Text style={s.joinBtnText}>＋ 参加</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleSignOut}>
+            <Text style={s.signout}>ログアウト</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* ソートタブ */}
@@ -389,6 +472,12 @@ export function AlbumsScreen({ onNavigate, onNavigateToAlbum }: { onNavigate: (s
         onClose={() => setShowCreate(false)}
         onCreated={a => setAlbums(prev => [a, ...prev])}
       />
+
+      <JoinModal
+        visible={showJoin}
+        onClose={() => setShowJoin(false)}
+        onJoined={upsertAlbum}
+      />
     </SafeAreaView>
   );
 }
@@ -402,6 +491,9 @@ const s = StyleSheet.create({
     borderBottomWidth: 1.5, borderBottomColor: C.dark,
   },
   headerTitle: { fontSize: 16, fontWeight: '900', color: C.dark, letterSpacing: 6 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  joinBtn: { borderWidth: 1.5, borderColor: C.dark, paddingHorizontal: 10, paddingVertical: 4 },
+  joinBtnText: { fontSize: 12, color: C.dark, fontWeight: '700' },
   sortTabs: {
     flexDirection: 'row',
     borderBottomWidth: 1.5, borderBottomColor: C.dark,

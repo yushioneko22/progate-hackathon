@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import { token } from './token';
-import type { Album, FiltersResponse, Movie, Photo, Todo, TokenResponse } from './types';
+import type { Album, FiltersResponse, InviteCode, Member, Movie, Photo, Todo, TokenResponse } from './types';
 
 function resolveApiUrl(): string {
   const fromEnv = process.env.EXPO_PUBLIC_API_URL;
@@ -84,6 +84,17 @@ export const api = {
   listAlbums: () => request<Album[]>('/albums', undefined, true),
   createAlbum: (data: { title: string; reveal_date: string; max_exposures: number; bgm_url?: string }) =>
     request<Album>('/albums', { method: 'POST', body: JSON.stringify(data) }, true),
+
+  // --- メンバー共有 ---
+  // オーナーが招待コードを発行する
+  createInvite: (albumId: string) =>
+    request<InviteCode>(`/albums/${albumId}/invites`, { method: 'POST' }, true),
+  // 招待コードでアルバムに参加する
+  joinAlbum: (code: string) =>
+    request<Album>('/albums/join', { method: 'POST', body: JSON.stringify({ code }) }, true),
+  // アルバムのメンバー一覧
+  listMembers: (albumId: string) =>
+    request<Member[]>(`/albums/${albumId}/members`, undefined, true),
 
   listPhotos: (albumId: string) =>
     request<Photo[]>(`/albums/${albumId}/photos`, undefined, true),
