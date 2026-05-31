@@ -5,7 +5,11 @@
     "version": "0.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
-    "scheme": ["kawarun", "com.progatehackathon.todo"],
+    "scheme": [
+      "kawarun",
+      "com.progatehackathon.todo",
+      "com.googleusercontent.apps.586495338606-bvombchuohdbfppvfuspa5oadto8mbfe"
+    ],
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,

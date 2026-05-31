@@ -170,10 +170,20 @@ function GoogleSignInButton({
   setError: (v: string) => void;
   onSuccess: () => void;
 }) {
+  // Google は iOS のネイティブアプリに「逆順クライアントID」スキームの
+  // リダイレクトを要求する(bundle ID スキームだと invalid_request で弾かれる)。
+  // iosClientId から `com.googleusercontent.apps.<id>:/oauthredirect` を生成する。
+  const iosId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+  const iosRedirectUri =
+    Platform.OS === 'ios' && iosId
+      ? `com.googleusercontent.apps.${iosId.replace('.apps.googleusercontent.com', '')}:/oauthredirect`
+      : undefined;
+
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
     iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
     androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
     webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+    redirectUri: iosRedirectUri,
   });
 
   // Google 認証が成功したら id_token をバックエンドへ送り、自前の JWT を受け取る。
