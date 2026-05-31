@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import { token } from './token';
-import type { Album, FiltersResponse, Movie, Photo, Todo, TokenResponse } from './types';
+import type { AiTransformResult, Album, FiltersResponse, Movie, Photo, Todo, TokenResponse } from './types';
 
 function resolveApiUrl(): string {
   const fromEnv = process.env.EXPO_PUBLIC_API_URL;
@@ -103,6 +103,13 @@ export const api = {
   },
 
   listFilters: () => request<FiltersResponse>('/filters', undefined, true),
+
+  aiTransformPhoto: (albumId: string, photoId: string, prompt: string) =>
+    request<AiTransformResult>(
+      `/albums/${albumId}/photos/${photoId}/ai-transform`,
+      { method: 'POST', body: JSON.stringify({ prompt }) },
+      true,
+    ),
 
   // スライドショー動画(MP4)の生成を開始する(非同期)。pending のジョブが返る。
   requestMovie: (albumId: string) =>

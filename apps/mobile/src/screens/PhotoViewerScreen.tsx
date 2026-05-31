@@ -3,6 +3,7 @@ import {
   View, Image, TouchableOpacity, Text, StyleSheet,
   Dimensions, Animated, Platform, FlatList,
 } from 'react-native';
+import { AiTransformModal } from '../components/AiTransformModal';
 import type { Photo } from '../lib/types';
 
 const { width: SW, height: SH } = Dimensions.get('window');
@@ -31,11 +32,14 @@ type Props = {
   origin?: Origin | null;
   visible: boolean;
   onClose: () => void;
+  onPhotoAdded?: (photo: Photo) => void;
 };
 
-export function PhotoViewerScreen({ photos, initialIndex, origin, visible, onClose }: Props) {
+export function PhotoViewerScreen({ photos, initialIndex, origin, visible, onClose, onPhotoAdded }: Props) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const currentIndexRef = useRef(initialIndex);
+  const [aiModalVisible, setAiModalVisible] = useState(false);
+  const [aiTargetPhoto, setAiTargetPhoto]   = useState<Photo | null>(null);
   const flatListRef = useRef<FlatList<Photo>>(null);
 
   const photoScale = useRef(new Animated.Value(1)).current;
@@ -158,9 +162,14 @@ export function PhotoViewerScreen({ photos, initialIndex, origin, visible, onClo
               initialScrollIndex={initialIndex}
               getItemLayout={(_, i) => ({ length: CARD_WIDTH, offset: CARD_WIDTH * i, index: i })}
               renderItem={({ item }) => (
-                <View style={s.photoItem}>
+                <TouchableOpacity
+                  style={s.photoItem}
+                  activeOpacity={1}
+                  onLongPress={() => { setAiTargetPhoto(item); setAiModalVisible(true); }}
+                  delayLongPress={500}
+                >
                   <Image source={{ uri: item.url }} style={s.photo} resizeMode="contain" />
-                </View>
+                </TouchableOpacity>
               )}
               onMomentumScrollEnd={e => {
                 const idx = Math.round(e.nativeEvent.contentOffset.x / CARD_WIDTH);
@@ -201,6 +210,16 @@ export function PhotoViewerScreen({ photos, initialIndex, origin, visible, onClo
           );
         })}
       </Animated.View>
+
+      {/* AI加工モーダル */}
+      {aiTargetPhoto && (
+        <AiTransformModal
+          visible={aiModalVisible}
+          photo={aiTargetPhoto}
+          onClose={() => setAiModalVisible(false)}
+          onSaved={photo => { onPhotoAdded?.(photo); setAiModalVisible(false); }}
+        />
+      )}
 
     </View>
   );

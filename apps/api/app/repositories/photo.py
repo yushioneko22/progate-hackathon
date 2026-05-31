@@ -13,6 +13,9 @@ class PhotoRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
+    async def get(self, photo_id: uuid.UUID) -> "Photo | None":
+        return await self._session.get(Photo, photo_id)
+
     async def get_album(self, album_id: uuid.UUID) -> Album | None:
         return await self._session.get(Album, album_id)
 
