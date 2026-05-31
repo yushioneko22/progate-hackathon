@@ -44,6 +44,13 @@ async def join_album(
     return await service.join_by_code(payload.code, user_id=current_user.id)
 
 
+@router.delete("/{album_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_album(
+    album_id: uuid.UUID, service: ServiceDep, current_user: CurrentUser
+) -> None:
+    await service.delete_album(album_id, user_id=current_user.id)
+
+
 @router.post(
     "/{album_id}/invites",
     response_model=InviteCodeRead,

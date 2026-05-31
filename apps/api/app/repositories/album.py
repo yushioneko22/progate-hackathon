@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -54,6 +54,11 @@ class AlbumRepository:
 
     async def get(self, album_id: uuid.UUID) -> Album | None:
         return await self._session.get(Album, album_id)
+
+    async def delete_by_id(self, album_id: uuid.UUID) -> None:
+        # 子テーブル(members/invites/photos/movies)は FK の ondelete=CASCADE で
+        # DB 側が連鎖削除する。Core の DELETE で ORM のリレーション処理を回避する。
+        await self._session.execute(delete(Album).where(Album.id == album_id))
 
     async def get_member(
         self, *, album_id: uuid.UUID, user_id: uuid.UUID
