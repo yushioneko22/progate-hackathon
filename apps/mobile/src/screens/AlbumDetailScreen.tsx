@@ -13,6 +13,7 @@ import { PhotoSelectScreen } from './PhotoSelectScreen';
 import { PhotoViewerScreen, type Origin } from './PhotoViewerScreen';
 import { ShakeRevealScreen } from './ShakeRevealScreen';
 import { SlideshowScreen } from './SlideshowScreen';
+import { FilmCameraScreen } from './FilmCameraScreen';
 
 // 送信前に端末側で長辺をこのサイズに収める。フル解像度のままだと端末→サーバーの
 // WiFi転送が重くアップロードが遅い(サーバー処理自体は約1秒)。表示版は1280pxなので
@@ -237,6 +238,7 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
   const [selectedPreset, setSelectedPreset] = useState('classic-film');
   // null = 確認中, false = 未開封（シェイク演出を表示）, true = 開封済み
   const [revealed, setRevealed] = useState<boolean | null>(null);
+  const [filmCameraVisible, setFilmCameraVisible] = useState(false);
 
   // 現像日時になったら自動でOPENEDに切り替え
   useEffect(() => {
@@ -283,29 +285,28 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
       });
   }, []);
 
-  // 撮影/選択した画像を保持し、フィルター選択モーダルを開く
+  // カメラ撮影はフィルムカメラUIで、ライブラリ選択はそのまま
   async function pickImage(source: 'camera' | 'library') {
-    const perm =
-      source === 'camera'
-        ? await ImagePicker.requestCameraPermissionsAsync()
-        : await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert(
-        '権限が必要です',
-        source === 'camera'
-          ? 'カメラへのアクセスを許可してください'
-          : '写真ライブラリへのアクセスを許可してください',
-      );
+    if (source === 'camera') {
+      setFilmCameraVisible(true);
       return;
     }
-    const result =
-      source === 'camera'
-        ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.6 })
-        : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.6 });
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('権限が必要です', '写真ライブラリへのアクセスを許可してください');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.6 });
     if (result.canceled) return;
-
     setSelectedPreset(defaultPreset);
     setPendingAsset(result.assets[0]);
+  }
+
+  // フィルムカメラで撮影完了
+  function handleFilmCapture(uri: string, width: number, height: number) {
+    setFilmCameraVisible(false);
+    setSelectedPreset(defaultPreset);
+    setPendingAsset({ uri, width, height, assetId: null, fileName: 'photo.jpg', mimeType: 'image/jpeg', type: 'image', fileSize: undefined, duration: null, base64: null } as ImagePicker.ImagePickerAsset);
   }
 
   // 「このフィルターで保存」押下時に確認ダイアログを挟む
@@ -480,6 +481,16 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
               setPhotoSelectVisible(false);
               setSlideshowVisible(true);
             }}
+          />
+        </View>
+      )}
+
+      {filmCameraVisible && (
+        <View style={StyleSheet.absoluteFill}>
+          <FilmCameraScreen
+            exposuresLeft={album.max_exposures - count}
+            onCapture={handleFilmCapture}
+            onClose={() => setFilmCameraVisible(false)}
           />
         </View>
       )}
