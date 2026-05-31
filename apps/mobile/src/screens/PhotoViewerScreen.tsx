@@ -216,10 +216,10 @@ const s = StyleSheet.create({
   },
   closeBtn: {
     width: 36, height: 36, borderRadius: 18,
-    backgroundColor: 'rgba(28,18,8,0.12)',
+    backgroundColor: 'rgba(28,18,8,0.65)',
     alignItems: 'center', justifyContent: 'center',
   },
-  closeText: { color: '#1C1208', fontSize: 14, fontWeight: '700' },
+  closeText: { color: '#F8F0DC', fontSize: 14, fontWeight: '700' },
   counter: {
     flex: 1, textAlign: 'center',
     color: 'rgba(28,18,8,0.45)', fontSize: 12, letterSpacing: 2,
