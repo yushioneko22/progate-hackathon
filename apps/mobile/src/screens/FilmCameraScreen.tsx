@@ -174,7 +174,7 @@ export function FilmCameraScreen({ exposuresLeft, onCapture, onClose }: Props) {
     return (
       <View style={s.body}>
         <StatusBar hidden />
-        <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="front" />
+        <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="front" flash={flash ? 'on' : 'off'} />
         {shooting && <View style={[s.shootFlash, StyleSheet.absoluteFill]} />}
 
         <View style={[s.topBar, { paddingTop: SAFE_H }]}>
@@ -193,6 +193,11 @@ export function FilmCameraScreen({ exposuresLeft, onCapture, onClose }: Props) {
             <TouchableOpacity style={s.shutter} onPress={shoot} activeOpacity={0.85} disabled={shooting}>
               <View style={s.shutterRing}>
                 <View style={[s.shutterInner, shooting && s.shutterPressed]} />
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.flashBtn} onPress={() => setFlash(f => !f)} activeOpacity={0.7}>
+              <View style={[s.flashBtnInner, flash && s.flashBtnActive]}>
+                <Text style={s.flashIcon}>⚡</Text>
               </View>
             </TouchableOpacity>
             <TouchableOpacity style={s.flipBtn} onPress={() => setFacing('back')} activeOpacity={0.7}>
