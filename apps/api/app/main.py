@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.routers import albums, auth, filters, photos, todos
+from app.routers import albums, auth, filters, movies, photos, todos
 
 
 def create_app() -> FastAPI:
@@ -24,6 +24,7 @@ def create_app() -> FastAPI:
     app.include_router(albums.router)
     app.include_router(photos.router)
     app.include_router(filters.router)
+    app.include_router(movies.router)
     return app
 
 
