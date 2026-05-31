@@ -6,8 +6,10 @@ import {
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ScreenOrientation from 'expo-screen-orientation';
 
-const SAFE_H   = Platform.OS === 'ios' ? 44 : 24; // 横画面のセーフエリア（短辺側）
+const SAFE_H   = Platform.OS === 'ios' ? 44 : 24;
 const BORDER   = 14;
+
+type Facing = 'back' | 'front';
 
 type Props = {
   exposuresLeft: number;
@@ -19,25 +21,29 @@ export function FilmCameraScreen({ exposuresLeft, onCapture, onClose }: Props) {
   const [permission, requestPermission] = useCameraPermissions();
   const [flash, setFlash]       = useState(false);
   const [shooting, setShooting] = useState(false);
+  const [facing, setFacing]     = useState<Facing>('back');
   const cameraRef               = useRef<CameraView>(null);
 
-  // 横画面ロック（右回転 = 物理ボタンが左側へ）
+  // 常に横画面ロック
   useEffect(() => {
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE_RIGHT);
+  }, []);
+
+  // アンマウント時は縦画面に戻す
+  useEffect(() => {
     return () => {
       ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
     };
   }, []);
 
-  // ロック後に横画面の実寸が返ってくる
   const { width: WW, height: WH } = useWindowDimensions();
 
-  // ファインダーサイズ（横画面の短辺 WH を基準）
-  const TOP_BAR_H  = SAFE_H + 48;
-  const BOT_BAR_H  = 36;
-  const AVAIL_H    = WH - TOP_BAR_H - BOT_BAR_H;
-  const FINDER_H   = Math.min(AVAIL_H * 0.9, WW * 0.65);
-  const FINDER_W   = FINDER_H * 1.38; // 若干横長
+  // バックカメラ用ファインダーサイズ
+  const TOP_BAR_H = SAFE_H + 48;
+  const BOT_BAR_H = 36;
+  const AVAIL_H   = WH - TOP_BAR_H - BOT_BAR_H;
+  const FINDER_H  = Math.min(AVAIL_H * 0.9, WW * 0.65);
+  const FINDER_W  = FINDER_H * 1.38;
 
   async function shoot() {
     if (!cameraRef.current || shooting) return;
@@ -66,6 +72,49 @@ export function FilmCameraScreen({ exposuresLeft, onCapture, onClose }: Props) {
     );
   }
 
+  // ── インカメ：バックカメラと同じレイアウトで全画面プレビュー ──
+  if (facing === 'front') {
+    return (
+      <View style={s.body}>
+        <StatusBar hidden />
+        <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="front" />
+        {shooting && <View style={[s.shootFlash, StyleSheet.absoluteFill]} />}
+
+        <View style={[s.topBar, { paddingTop: SAFE_H }]}>
+          <TouchableOpacity onPress={onClose} style={s.closeBtn}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <Text style={s.closeText}>✕</Text>
+          </TouchableOpacity>
+          <View style={s.brandPill}>
+            <Text style={s.brandText}>変ルンです</Text>
+          </View>
+        </View>
+
+        <View style={s.mainArea}>
+          <View style={{ flex: 1 }} />
+          <View style={s.controlsCol}>
+            <TouchableOpacity style={s.shutter} onPress={shoot} activeOpacity={0.85} disabled={shooting}>
+              <View style={s.shutterRing}>
+                <View style={[s.shutterInner, shooting && s.shutterPressed]} />
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.flipBtn} onPress={() => setFacing('back')} activeOpacity={0.7}>
+              <View style={s.flipBtnInner}>
+                <Text style={s.flipIcon}>⟳</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={s.bottomBar}>
+          <Text style={s.counterNum}>{exposuresLeft}</Text>
+          <Text style={s.counterLabel}>EXP</Text>
+        </View>
+      </View>
+    );
+  }
+
+  // ── バックカメラ：フィルムカメラ横画面レイアウト ──────────
   return (
     <View style={s.body}>
       <StatusBar hidden />
@@ -81,10 +130,9 @@ export function FilmCameraScreen({ exposuresLeft, onCapture, onClose }: Props) {
         </View>
       </View>
 
-      {/* ── メインエリア：スペーサー＋ファインダー（完全中央）＋ コントロール（右列） ── */}
+      {/* ── メインエリア ── */}
       <View style={s.mainArea}>
 
-        {/* 左スペーサー（右コントロール列と同幅で finder を画面中央に揃える） */}
         <View style={s.controlsSpacer} />
 
         {/* ファインダー */}
@@ -95,7 +143,7 @@ export function FilmCameraScreen({ exposuresLeft, onCapture, onClose }: Props) {
           </View>
         </View>
 
-        {/* 右コントロール列：シャッター（上）＋ フラッシュ（下） */}
+        {/* 右コントロール列：シャッター・フラッシュ・インカメ切替 */}
         <View style={s.controlsCol}>
           <TouchableOpacity style={s.shutter} onPress={shoot} activeOpacity={0.85} disabled={shooting}>
             <View style={s.shutterRing}>
@@ -107,11 +155,16 @@ export function FilmCameraScreen({ exposuresLeft, onCapture, onClose }: Props) {
               <Text style={s.flashIcon}>⚡</Text>
             </View>
           </TouchableOpacity>
+          <TouchableOpacity style={s.flipBtn} onPress={() => setFacing('front')} activeOpacity={0.7}>
+            <View style={s.flipBtnInner}>
+              <Text style={s.flipIcon}>⟳</Text>
+            </View>
+          </TouchableOpacity>
         </View>
 
       </View>
 
-      {/* ── ボトムバー：EXP（左下） ── */}
+      {/* ── ボトムバー：EXP ── */}
       <View style={s.bottomBar}>
         <Text style={s.counterNum}>{exposuresLeft}</Text>
         <Text style={s.counterLabel}>EXP</Text>
@@ -135,7 +188,8 @@ const s = StyleSheet.create({
   permClose:    { marginTop: 4 },
   permCloseText:{ color: '#888', fontSize: 14 },
 
-  // トップバー
+  // ── バックカメラ UI ──────────────────────────────────────
+
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -152,7 +206,6 @@ const s = StyleSheet.create({
   brandPill: { paddingHorizontal: 14, paddingVertical: 5, backgroundColor: DARK, borderRadius: 20 },
   brandText: { color: '#F8F0DC', fontSize: 12, fontWeight: '800', letterSpacing: 1.5 },
 
-  // メインエリア
   mainArea: {
     flex: 1,
     flexDirection: 'row',
@@ -162,7 +215,6 @@ const s = StyleSheet.create({
   },
   controlsSpacer: { width: 80 },
 
-  // ファインダー
   finderArea: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   finderOuter: {
     borderRadius: 16,
@@ -177,7 +229,6 @@ const s = StyleSheet.create({
   preview:    { flex: 1, borderRadius: 6, overflow: 'hidden' },
   shootFlash: { ...StyleSheet.absoluteFillObject, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.6)' },
 
-  // 右コントロール列
   controlsCol: {
     width: 80,
     alignItems: 'center',
@@ -185,7 +236,6 @@ const s = StyleSheet.create({
     gap: 20,
   },
 
-  // シャッター
   shutter: { alignItems: 'center', justifyContent: 'center' },
   shutterRing: {
     width: 72, height: 72, borderRadius: 36,
@@ -201,7 +251,6 @@ const s = StyleSheet.create({
   },
   shutterPressed: { backgroundColor: '#D0D0D0' },
 
-  // フラッシュ
   flashBtn: { alignItems: 'center', justifyContent: 'center' },
   flashBtnInner: {
     width: 44, height: 44, borderRadius: 22,
@@ -210,7 +259,13 @@ const s = StyleSheet.create({
   flashBtnActive: { backgroundColor: 'rgba(201,168,76,0.35)' },
   flashIcon:      { fontSize: 18 },
 
-  // ボトムバー（EXP）
+  flipBtn: { alignItems: 'center', justifyContent: 'center' },
+  flipBtnInner: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: 'rgba(28,18,8,0.10)', alignItems: 'center', justifyContent: 'center',
+  },
+  flipIcon: { fontSize: 20, color: DARK },
+
   bottomBar: {
     paddingHorizontal: 20,
     paddingBottom: 12,
@@ -220,4 +275,49 @@ const s = StyleSheet.create({
   },
   counterNum:  { fontSize: 16, fontWeight: '900', color: DARK },
   counterLabel:{ fontSize: 9, fontWeight: '700', color: '#666', letterSpacing: 1 },
+
+  // ── インカメ全画面 UI ────────────────────────────────────
+
+  selfieFlash: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.7)' },
+
+  selfieTop: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+  },
+  selfieCloseBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center',
+  },
+  selfieCloseText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  selfieExpRow:    { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
+  selfieExpNum:    { fontSize: 16, fontWeight: '900', color: '#fff' },
+  selfieExpLabel:  { fontSize: 9, fontWeight: '700', color: 'rgba(255,255,255,0.8)', letterSpacing: 1 },
+
+  selfieBottom: {
+    position: 'absolute',
+    bottom: 0, left: 0, right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 48,
+  },
+  selfieFlipBtn: {
+    width: 52, height: 52,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  selfieFlipIcon: { fontSize: 28, color: '#fff' },
+
+  selfieShutterRing: {
+    width: 80, height: 80, borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderWidth: 3, borderColor: '#fff',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  selfieShutterInner: {
+    width: 64, height: 64, borderRadius: 32, backgroundColor: '#fff',
+  },
 });
