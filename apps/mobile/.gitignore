@@ -6,3 +6,8 @@ web-build/
 .env
 .env.*
 !.env.example
+
+# ネイティブプロジェクトは app.json から prebuild で自動生成するため管理しない
+# (コミットするとブランチ切替で不整合が起き "ios project is malformed" の原因になる)
+/ios/
+/android/
