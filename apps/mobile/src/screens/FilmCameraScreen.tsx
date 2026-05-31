@@ -1,16 +1,112 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Platform, StatusBar,
-  useWindowDimensions,
+  useWindowDimensions, PanResponder,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ScreenOrientation from 'expo-screen-orientation';
+import * as Haptics from 'expo-haptics';
 
-const SAFE_H   = Platform.OS === 'ios' ? 44 : 24;
-const BORDER   = 14;
+const SAFE_H = Platform.OS === 'ios' ? 44 : 24;
+const BORDER = 14;
+
+// ズームダイアル定数
+const DIAL_R  = 54; // 弧の半径（大きめ）
+const DIAL_D  = DIAL_R * 2;
+const ARC_W   = 3;
+const THUMB_R = 7;
+// コンテナ内での円の中心座標（上端にサムが出るぶんTHUMB_R分下げる）
+const DIAL_CX = DIAL_R;
+const DIAL_CY = DIAL_R + THUMB_R;
+const DIAL_H  = DIAL_R + THUMB_R; // コンテナ高さ
 
 type Facing = 'back' | 'front';
 
+// ── ズームダイアル ────────────────────────────────────────────
+type ZoomDialProps = { zoom: number; onChange: (z: number) => void };
+
+function ZoomDial({ zoom, onChange }: ZoomDialProps) {
+  const viewRef       = useRef<View>(null);
+  const offsetRef     = useRef({ x: 0, y: 0 });
+  const lastStepRef   = useRef(-1);
+
+  function applyTouch(pageX: number, pageY: number) {
+    const tx = pageX - offsetRef.current.x;
+    const ty = pageY - offsetRef.current.y;
+    const dx = tx - DIAL_CX;
+    const dy = DIAL_CY - ty; // Y反転（上が正）
+    let angle = Math.atan2(dy, dx); // -π〜π
+    // 下半分タッチは端にクランプ
+    if (angle < 0) angle = dx >= 0 ? 0 : Math.PI;
+    const newZoom = Math.max(0, Math.min(1, 1 - angle / Math.PI));
+    onChange(newZoom);
+    // 0.1刻みでハプティクス
+    const step = Math.round(newZoom * 10);
+    if (step !== lastStepRef.current) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      lastStepRef.current = step;
+    }
+  }
+
+  const pan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder:  () => true,
+      onPanResponderGrant: e => {
+        viewRef.current?.measureInWindow((x, y) => {
+          offsetRef.current = { x, y };
+          applyTouch(e.nativeEvent.pageX, e.nativeEvent.pageY);
+        });
+      },
+      onPanResponderMove: e => applyTouch(e.nativeEvent.pageX, e.nativeEvent.pageY),
+    })
+  ).current;
+
+  // サムの位置（時計回りに動かすと zoom 増加: 左端θ=π→zoom=0、右端θ=0→zoom=1）
+  const angle    = Math.PI * (1 - zoom);
+  const thumbLeft = DIAL_CX + DIAL_R * Math.cos(angle) - THUMB_R;
+  const thumbTop  = DIAL_CY - DIAL_R * Math.sin(angle) - THUMB_R;
+
+  return (
+    <View
+      ref={viewRef}
+      style={{ width: DIAL_D, height: DIAL_H, alignSelf: 'center' }}
+      {...pan.panHandlers}
+    >
+      {/* 弧（円の上半分だけ overflow:hidden でクリップ） */}
+      <View style={{
+        position: 'absolute', left: 0, top: THUMB_R,
+        width: DIAL_D, height: DIAL_R,
+        overflow: 'hidden',
+      }}>
+        <View style={{
+          position: 'absolute', left: 0, top: 0,
+          width: DIAL_D, height: DIAL_D,
+          borderRadius: DIAL_R,
+          borderWidth: ARC_W,
+          borderColor: 'rgba(28,18,8,0.35)',
+          backgroundColor: 'transparent',
+        }} />
+      </View>
+      {/* サム（現在位置を示す白丸） */}
+      <View style={{
+        position: 'absolute',
+        left: thumbLeft,
+        top: thumbTop,
+        width: THUMB_R * 2,
+        height: THUMB_R * 2,
+        borderRadius: THUMB_R,
+        backgroundColor: DARK,
+        shadowColor: '#000',
+        shadowOpacity: 0.35,
+        shadowRadius: 2,
+        elevation: 4,
+      }} />
+    </View>
+  );
+}
+
+// ────────────────────────────────────────────────────────────
 type Props = {
   exposuresLeft: number;
   onCapture: (uri: string, width: number, height: number) => void;
@@ -22,6 +118,7 @@ export function FilmCameraScreen({ exposuresLeft, onCapture, onClose }: Props) {
   const [flash, setFlash]       = useState(false);
   const [shooting, setShooting] = useState(false);
   const [facing, setFacing]     = useState<Facing>('back');
+  const [zoom, setZoom]         = useState(0);
   const cameraRef               = useRef<CameraView>(null);
 
   // 常に横画面ロック
@@ -138,9 +235,14 @@ export function FilmCameraScreen({ exposuresLeft, onCapture, onClose }: Props) {
         {/* ファインダー */}
         <View style={s.finderArea}>
           <View style={[s.finderOuter, { width: FINDER_W, height: FINDER_H, marginBottom: TOP_BAR_H - BOT_BAR_H }]}>
-            <CameraView ref={cameraRef} style={s.preview} flash={flash ? 'on' : 'off'} />
+            <CameraView ref={cameraRef} style={s.preview} flash={flash ? 'on' : 'off'} zoom={zoom} />
             {shooting && <View style={s.shootFlash} />}
           </View>
+        </View>
+
+        {/* 右上コーナー：ズームダイアル */}
+        <View style={s.dialCorner}>
+          <ZoomDial zoom={zoom} onChange={setZoom} />
         </View>
 
         {/* 右コントロール列：シャッター・フラッシュ・インカメ切替 */}
@@ -228,6 +330,12 @@ const s = StyleSheet.create({
   },
   preview:    { flex: 1, borderRadius: 6, overflow: 'hidden' },
   shootFlash: { ...StyleSheet.absoluteFillObject, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.6)' },
+
+  dialCorner: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+  },
 
   controlsCol: {
     width: 80,
