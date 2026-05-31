@@ -111,3 +111,76 @@ def get_preset(preset_id: str | None) -> FilterPreset:
     if preset_id and preset_id in PRESETS:
         return PRESETS[preset_id]
     return PRESETS[DEFAULT_PRESET]
+
+
+def _clamp01(value: float) -> float:
+    return max(0.0, min(1.0, value))
+
+
+def _lerp(a: float, b: float, t: float) -> float:
+    return a + (b - a) * t
+
+
+def _lerp_list(a: list[float], b: list[float], t: float) -> list[float]:
+    return [_lerp(x, y, t) for x, y in zip(a, b, strict=True)]
+
+
+def _blend_pair(a: FilterPreset, b: FilterPreset, t: float) -> tuple[list[float], Vignette, Grain]:
+    """2つのプリセットのパラメータを比率 t で線形補間する(t=0 で a, t=1 で b)。"""
+    color = _lerp_list(a["color_matrix"], b["color_matrix"], t)
+    vignette: Vignette = {
+        "intensity": _lerp(a["vignette"]["intensity"], b["vignette"]["intensity"], t),
+        "radius": _lerp(a["vignette"]["radius"], b["vignette"]["radius"], t),
+    }
+    grain: Grain = {"amount": _lerp(a["grain"]["amount"], b["grain"]["amount"], t)}
+    return color, vignette, grain
+
+
+def effective_preset(
+    primary_id: str | None,
+    *,
+    secondary_id: str | None = None,
+    mix: float = 0.0,
+    strength: float = 1.0,
+) -> FilterPreset:
+    """ブレンド済みの実効プリセットを組み立てる。
+
+    1. 2フィルター混合: blended = primary×(1-mix) + secondary×mix
+    2. 強度適用:        effective = none(無加工)×(1-strength) + blended×strength
+
+    色行列・ビネット・グレインを線形補間するだけなので、将来クライアント(Skia)でも
+    同じ計算でプレビューを一致させられる。
+    """
+    mix = _clamp01(mix)
+    strength = _clamp01(strength)
+
+    primary = get_preset(primary_id)
+    # 2フィルター混合(secondary 指定かつ mix>0 のときのみ)
+    if secondary_id and secondary_id in PRESETS and mix > 0:
+        color, vignette, grain = _blend_pair(primary, PRESETS[secondary_id], mix)
+        label = f"{primary['id']}+{secondary_id}@{mix:.2f}"
+    else:
+        color = list(primary["color_matrix"])
+        vignette = dict(primary["vignette"])  # type: ignore[assignment]
+        grain = dict(primary["grain"])  # type: ignore[assignment]
+        label = primary["id"]
+
+    # 強度適用(none へ向けて補間)。strength=1 なら素通り。
+    if strength < 1.0:
+        none = PRESETS["none"]
+        color = _lerp_list(none["color_matrix"], color, strength)
+        vignette = {
+            "intensity": vignette["intensity"] * strength,
+            "radius": _lerp(none["vignette"]["radius"], vignette["radius"], strength),
+        }
+        grain = {"amount": grain["amount"] * strength}
+        label = f"{label}x{strength:.2f}"
+
+    return {
+        "id": label,
+        "name": primary["name"],
+        "description": "blended",
+        "color_matrix": color,
+        "vignette": vignette,
+        "grain": grain,
+    }
