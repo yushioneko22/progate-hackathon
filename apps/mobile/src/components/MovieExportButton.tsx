@@ -29,6 +29,19 @@ export function MovieExportButton({ albumId }: { albumId: string }) {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
 
+  // 「作る」押下時に、編集するか/そのまま作るかを確認する
+  function promptEdit() {
+    Alert.alert('編集しますか？', '写真の順番やBGMなどを編集できます', [
+      { text: 'そのまま作成', onPress: generate },
+      {
+        text: '編集して作成',
+        onPress: () =>
+          Alert.alert('準備中', '編集機能は近日対応予定です。今は「そのまま作成」をご利用ください'),
+      },
+      { text: 'キャンセル', style: 'cancel' },
+    ]);
+  }
+
   async function generate() {
     setPhase('working');
     setVideoUrl(null);
@@ -73,7 +86,7 @@ export function MovieExportButton({ albumId }: { albumId: string }) {
 
   return (
     <>
-      <TouchableOpacity style={s.cta} onPress={generate} activeOpacity={0.85}>
+      <TouchableOpacity style={s.cta} onPress={promptEdit} activeOpacity={0.85}>
         <Text style={s.ctaText}>🎬  フォトムービーを作る</Text>
       </TouchableOpacity>
 
