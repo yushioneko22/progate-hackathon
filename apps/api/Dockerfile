@@ -17,6 +17,10 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # --- runtime ---
 FROM base AS runtime
+# ffmpeg: 写真からスライドショー動画(MP4)を合成するのに使う
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=deps /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:${PATH}"
 COPY apps/api/app ./app

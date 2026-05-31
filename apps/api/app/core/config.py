@@ -1,5 +1,7 @@
+from typing import Annotated
+
 from pydantic import field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -24,6 +26,27 @@ class Settings(BaseSettings):
         "http://localhost:19006",
     ]
     api_port: int = 8787
+
+    # 認証: 自前のセッショントークン(JWT)の署名鍵と有効期限。
+    # 本番では必ず環境変数 JWT_SECRET を上書きすること(既定値は開発用)。
+    jwt_secret: str = "dev-insecure-change-me-please-set-jwt-secret-env"
+    jwt_algorithm: str = "HS256"
+    jwt_expires_min: int = 60 * 24 * 30  # 30日
+
+    # Google ログイン: 検証時に許容する audience(client ID)の一覧。
+    # iOS / Android / Web で別々の client ID が発行されるため複数許容する。
+    # 環境変数 GOOGLE_CLIENT_IDS にカンマ区切りで指定 (例: "xxx.apps...,yyy.apps...")。
+    # NoDecode: pydantic-settings の JSON 自動デコードを抑止し、下の validator で
+    # カンマ区切り文字列を list へ変換する(JSON 配列での指定も不要にする)。
+    google_client_ids: Annotated[list[str], NoDecode] = []
+
+    @field_validator("google_client_ids", mode="before")
+    @classmethod
+    def _split_client_ids(cls, value: object) -> object:
+        # env からは文字列で渡るためカンマ区切りを list に変換する。
+        if isinstance(value, str):
+            return [v.strip() for v in value.split(",") if v.strip()]
+        return value
 
     # Supabase Storage (写真の実体を保存するオブジェクトストレージ)
     # supabase_key は service_role(secret) キーを使う(anon ではアップロード不可)

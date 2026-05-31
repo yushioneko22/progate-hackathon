@@ -16,10 +16,18 @@ class UserRepository:
         self,
         *,
         email: str,
-        password_hash: str,
+        password_hash: str | None,
         display_name: str,
+        avatar_url: str | None = None,
+        google_sub: str | None = None,
     ) -> User:
-        user = User(email=email, password_hash=password_hash, display_name=display_name)
+        user = User(
+            email=email,
+            password_hash=password_hash,
+            display_name=display_name,
+            avatar_url=avatar_url,
+            google_sub=google_sub,
+        )
         self._session.add(user)
         await self._session.flush()
         await self._session.refresh(user)

@@ -8,6 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { api } from '../lib/api';
 import type { Album, FilterPreset, Photo } from '../lib/types';
+import { MovieExportButton } from '../components/MovieExportButton';
 import { PhotoSelectScreen } from './PhotoSelectScreen';
 import { PhotoViewerScreen, type Origin } from './PhotoViewerScreen';
 import { ShakeRevealScreen } from './ShakeRevealScreen';
@@ -165,9 +166,12 @@ function OpenedView({
         <Text style={s.revealDate}>{formatRevealDate(album.reveal_date)} に現像されました</Text>
 
         {!loading && photos.length > 0 && (
-          <TouchableOpacity style={s.movieBtn} onPress={onStartSlideshow} activeOpacity={0.85}>
-            <Text style={s.movieBtnText}>▶  フォトムービーを再生</Text>
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity style={s.movieBtn} onPress={onStartSlideshow} activeOpacity={0.85}>
+              <Text style={s.movieBtnText}>▶  フォトムービーを再生</Text>
+            </TouchableOpacity>
+            <MovieExportButton albumId={album.id} />
+          </>
         )}
       </Animated.View>
 

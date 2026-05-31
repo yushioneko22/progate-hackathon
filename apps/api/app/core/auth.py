@@ -1,10 +1,10 @@
-import uuid
 from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
+from app.core.jwt import decode_access_token
 from app.models.user import User
 
 
@@ -16,9 +16,11 @@ async def get_current_user(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="invalid token")
     token = authorization.removeprefix("Bearer ").strip()
     try:
-        user_id = uuid.UUID(token)
-    except ValueError:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="invalid token")
+        user_id = decode_access_token(token)
+    except Exception as err:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED, detail="invalid token"
+        ) from err
     user = await session.get(User, user_id)
     if user is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="user not found")

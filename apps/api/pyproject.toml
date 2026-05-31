@@ -16,6 +16,10 @@ dependencies = [
     "pillow>=11.0.0",
     "pillow-heif>=0.18.0",
     "numpy>=2.1.0",
+    "pyjwt>=2.10.0",
+    "google-auth>=2.0.0",
+    "requests>=2.32.0",
+    "bcrypt>=4.0.0",
 ]
 
 [dependency-groups]
