@@ -11,7 +11,7 @@ const SAFE_H = Platform.OS === 'ios' ? 44 : 24;
 const BORDER = 14;
 
 // ズームダイアル定数
-const DIAL_R  = 54; // 弧の半径（大きめ）
+const DIAL_R  = 46; // 弧の半径
 const DIAL_D  = DIAL_R * 2;
 const ARC_W   = 3;
 const THUMB_R = 7;
@@ -240,11 +240,6 @@ export function FilmCameraScreen({ exposuresLeft, onCapture, onClose }: Props) {
           </View>
         </View>
 
-        {/* 右上コーナー：ズームダイアル */}
-        <View style={s.dialCorner}>
-          <ZoomDial zoom={zoom} onChange={setZoom} />
-        </View>
-
         {/* 右コントロール列：シャッター・フラッシュ・インカメ切替 */}
         <View style={s.controlsCol}>
           <TouchableOpacity style={s.shutter} onPress={shoot} activeOpacity={0.85} disabled={shooting}>
@@ -270,6 +265,11 @@ export function FilmCameraScreen({ exposuresLeft, onCapture, onClose }: Props) {
       <View style={s.bottomBar}>
         <Text style={s.counterNum}>{exposuresLeft}</Text>
         <Text style={s.counterLabel}>EXP</Text>
+      </View>
+
+      {/* ── ズームダイアル：body 右上コーナーに絶対配置 ── */}
+      <View style={[s.dialCorner, { top: TOP_BAR_H }]}>
+        <ZoomDial zoom={zoom} onChange={setZoom} />
       </View>
 
     </View>
