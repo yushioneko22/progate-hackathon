@@ -38,6 +38,9 @@ importers:
       expo-av:
         specifier: ~16.0.8
         version: 16.0.8(expo@54.0.34(@babel/core@7.29.0)(@expo/metro-runtime@5.0.5(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)))(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)(typescript@5.9.3))(react-native-web@0.20.0(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
+      expo-camera:
+        specifier: ~17.0.10
+        version: 17.0.10(expo@54.0.34(@babel/core@7.29.0)(@expo/metro-runtime@5.0.5(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)))(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)(typescript@5.9.3))(react-native-web@0.20.0(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
       expo-crypto:
         specifier: ^15.0.9
         version: 15.0.9(expo@54.0.34(@babel/core@7.29.0)(@expo/metro-runtime@5.0.5(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)))(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)(typescript@5.9.3))
@@ -50,6 +53,9 @@ importers:
       expo-image-picker:
         specifier: ~17.0.11
         version: 17.0.11(expo@54.0.34(@babel/core@7.29.0)(@expo/metro-runtime@5.0.5(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)))(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)(typescript@5.9.3))
+      expo-screen-orientation:
+        specifier: ~9.0.9
+        version: 9.0.9(expo@54.0.34(@babel/core@7.29.0)(@expo/metro-runtime@5.0.5(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)))(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)(typescript@5.9.3))(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))
       expo-sensors:
         specifier: ~15.0.8
         version: 15.0.8(expo@54.0.34(@babel/core@7.29.0)(@expo/metro-runtime@5.0.5(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)))(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)(typescript@5.9.3))(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))
@@ -2159,6 +2165,17 @@ packages:
       react-native-web:
         optional: true
 
+  expo-camera@17.0.10:
+    resolution: {integrity: sha512-w1RBw83mAGVk4BPPwNrCZyFop0VLiVSRE3c2V9onWbdFwonpRhzmB4drygG8YOUTl1H3wQvALJHyMPTbgsK1Jg==}
+    peerDependencies:
+      expo: '*'
+      react: '*'
+      react-native: '*'
+      react-native-web: '*'
+    peerDependenciesMeta:
+      react-native-web:
+        optional: true
+
   expo-constants@18.0.13:
     resolution: {integrity: sha512-FnZn12E1dRYKDHlAdIyNFhBurKTS3F9CrfrBDJI5m3D7U17KBHMQ6JEfYlSj7LG7t+Ulr+IKaj58L1k5gBwTcQ==}
     peerDependencies:
@@ -2223,6 +2240,12 @@ packages:
     resolution: {integrity: sha512-a6IrpAn/Jbmwxi9L+hMmXKpNqnkUpoF7WHOpn02rVLyax2J0gB1vvCVE5rNydplEnt41Q6WxQwvcOjZaIkcSUg==}
     peerDependencies:
       react: '*'
+      react-native: '*'
+
+  expo-screen-orientation@9.0.9:
+    resolution: {integrity: sha512-UTU745XoqBvQJkZ820GTfMuOxlkppYqaeQ+x0wdu44cyrZiZugqe+egFF2+zC+SaxgAltU5EuO8GIj9xSF+YMw==}
+    peerDependencies:
+      expo: '*'
       react-native: '*'
 
   expo-sensors@15.0.8:
@@ -6712,6 +6735,15 @@ snapshots:
     optionalDependencies:
       react-native-web: 0.20.0(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
 
+  expo-camera@17.0.10(expo@54.0.34(@babel/core@7.29.0)(@expo/metro-runtime@5.0.5(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)))(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)(typescript@5.9.3))(react-native-web@0.20.0(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0):
+    dependencies:
+      expo: 54.0.34(@babel/core@7.29.0)(@expo/metro-runtime@5.0.5(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)))(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)(typescript@5.9.3)
+      invariant: 2.2.4
+      react: 19.1.0
+      react-native: 0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)
+    optionalDependencies:
+      react-native-web: 0.20.0(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+
   expo-constants@18.0.13(expo@54.0.34(@babel/core@7.29.0)(@expo/metro-runtime@5.0.5(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)))(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)(typescript@5.9.3))(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)):
     dependencies:
       '@expo/config': 12.0.13
@@ -6783,6 +6815,11 @@ snapshots:
     dependencies:
       invariant: 2.2.4
       react: 19.1.0
+      react-native: 0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)
+
+  expo-screen-orientation@9.0.9(expo@54.0.34(@babel/core@7.29.0)(@expo/metro-runtime@5.0.5(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)))(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)(typescript@5.9.3))(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)):
+    dependencies:
+      expo: 54.0.34(@babel/core@7.29.0)(@expo/metro-runtime@5.0.5(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)))(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)(typescript@5.9.3)
       react-native: 0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)
 
   expo-sensors@15.0.8(expo@54.0.34(@babel/core@7.29.0)(@expo/metro-runtime@5.0.5(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)))(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)(typescript@5.9.3))(react-native@0.81.4(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)):
