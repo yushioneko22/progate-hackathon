@@ -10,7 +10,7 @@ const SAFE_BOT = Platform.OS === 'ios' ? 44 : 24;
 
 // ファインダー寸法（気持ち横長・小さめで覗き込む感）
 const FINDER_W = SW * 0.52;
-const FINDER_H = FINDER_W * 0.82;
+const FINDER_H = FINDER_W * 1.22;
 const BORDER   = 18;
 
 type Props = {
