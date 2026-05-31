@@ -4,14 +4,14 @@ import {
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 
-const { width: SW, height: SH } = Dimensions.get('window');
+const { width: SW } = Dimensions.get('window');
 const SAFE_TOP = Platform.OS === 'ios' ? 56 : 32;
 const SAFE_BOT = Platform.OS === 'ios' ? 44 : 24;
 
-// ファインダー寸法（写ルンです風・やや縦長）
-const FINDER_W = SW * 0.68;
-const FINDER_H = FINDER_W * 1.08;
-const BORDER   = 16; // ファインダー枠の太さ
+// ファインダー寸法（正方形・小さめで覗き込む感）
+const FINDER_W = SW * 0.52;
+const FINDER_H = FINDER_W;
+const BORDER   = 18;
 
 type Props = {
   exposuresLeft: number;
