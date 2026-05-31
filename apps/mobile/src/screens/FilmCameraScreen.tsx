@@ -1,14 +1,59 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Platform, StatusBar,
-  useWindowDimensions,
+  useWindowDimensions, PanResponder,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
+import * as Haptics from 'expo-haptics';
 
-const SAFE_H   = Platform.OS === 'ios' ? 44 : 24;
-const BORDER   = 14;
+const SAFE_H = Platform.OS === 'ios' ? 44 : 24;
+const BORDER = 14;
+
+// ズームダイアル定数
+const DIAL_R  = 46; // 弧の半径
+const DIAL_D  = DIAL_R * 2;
+const ARC_W   = 3;
+const THUMB_R = 7;
+// コンテナ内での円の中心座標（上端にサムが出るぶんTHUMB_R分下げる）
+const DIAL_CX = DIAL_R;
+const DIAL_CY = DIAL_R + THUMB_R;
+const DIAL_H  = DIAL_R + THUMB_R; // コンテナ高さ
+
+// ファインダーと同じ横長比率(横:縦)。全撮影写真をこの比率に正規化する。
+const TARGET_ASPECT = 1.38;
+
+// 撮影直後の写真を「EXIFの向きを焼き込み + 横長1.38:1に中央クロップ」して
+// 正規化する。端末の向きや EXIF の差で縦横がバラつく問題を解消し、
+// グリッド/スライドショーで一貫したサイズ・向きにする。
+async function normalizeToLandscape(
+  uri: string,
+): Promise<{ uri: string; width: number; height: number }> {
+  // まず無加工で描画 → EXIF 適用後の正しい(upright)寸法を得る
+  const upright = await ImageManipulator.manipulate(uri).renderAsync();
+  const w = upright.width;
+  const h = upright.height;
+
+  // 中央を TARGET_ASPECT の横長にクロップ
+  let cropW: number;
+  let cropH: number;
+  if (w / h >= TARGET_ASPECT) {
+    cropH = h;
+    cropW = Math.round(h * TARGET_ASPECT);
+  } else {
+    cropW = w;
+    cropH = Math.round(w / TARGET_ASPECT);
+  }
+  const originX = Math.round((w - cropW) / 2);
+  const originY = Math.round((h - cropH) / 2);
+
+  const ctx = ImageManipulator.manipulate(uri);
+  ctx.crop({ originX, originY, width: cropW, height: cropH });
+  const ref = await ctx.renderAsync();
+  const result = await ref.saveAsync({ compress: 0.85, format: SaveFormat.JPEG });
+  return { uri: result.uri, width: result.width, height: result.height };
+}
 
 // ファインダーと同じ横長比率(横:縦)。全撮影写真をこの比率に正規化する。
 const TARGET_ASPECT = 1.38;
@@ -46,6 +91,91 @@ async function normalizeToLandscape(
 
 type Facing = 'back' | 'front';
 
+// ── ズームダイアル ────────────────────────────────────────────
+type ZoomDialProps = { zoom: number; onChange: (z: number) => void };
+
+function ZoomDial({ zoom, onChange }: ZoomDialProps) {
+  const viewRef       = useRef<View>(null);
+  const offsetRef     = useRef({ x: 0, y: 0 });
+  const lastStepRef   = useRef(-1);
+
+  function applyTouch(pageX: number, pageY: number) {
+    const tx = pageX - offsetRef.current.x;
+    const ty = pageY - offsetRef.current.y;
+    const dx = tx - DIAL_CX;
+    const dy = DIAL_CY - ty; // Y反転（上が正）
+    let angle = Math.atan2(dy, dx); // -π〜π
+    // 下半分タッチは端にクランプ
+    if (angle < 0) angle = dx >= 0 ? 0 : Math.PI;
+    const newZoom = Math.max(0, Math.min(1, 1 - angle / Math.PI));
+    onChange(newZoom);
+    // 0.1刻みでハプティクス
+    const step = Math.round(newZoom * 10);
+    if (step !== lastStepRef.current) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      lastStepRef.current = step;
+    }
+  }
+
+  const pan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder:  () => true,
+      onPanResponderGrant: e => {
+        viewRef.current?.measureInWindow((x, y) => {
+          offsetRef.current = { x, y };
+          applyTouch(e.nativeEvent.pageX, e.nativeEvent.pageY);
+        });
+      },
+      onPanResponderMove: e => applyTouch(e.nativeEvent.pageX, e.nativeEvent.pageY),
+    })
+  ).current;
+
+  // サムの位置（時計回りに動かすと zoom 増加: 左端θ=π→zoom=0、右端θ=0→zoom=1）
+  const angle    = Math.PI * (1 - zoom);
+  const thumbLeft = DIAL_CX + DIAL_R * Math.cos(angle) - THUMB_R;
+  const thumbTop  = DIAL_CY - DIAL_R * Math.sin(angle) - THUMB_R;
+
+  return (
+    <View
+      ref={viewRef}
+      style={{ width: DIAL_D, height: DIAL_H, alignSelf: 'center' }}
+      {...pan.panHandlers}
+    >
+      {/* 弧（円の上半分だけ overflow:hidden でクリップ） */}
+      <View style={{
+        position: 'absolute', left: 0, top: THUMB_R,
+        width: DIAL_D, height: DIAL_R,
+        overflow: 'hidden',
+      }}>
+        <View style={{
+          position: 'absolute', left: 0, top: 0,
+          width: DIAL_D, height: DIAL_D,
+          borderRadius: DIAL_R,
+          borderWidth: ARC_W,
+          borderColor: 'rgba(28,18,8,0.35)',
+          backgroundColor: 'transparent',
+        }} />
+      </View>
+      {/* サム（現在位置を示す白丸） */}
+      <View style={{
+        position: 'absolute',
+        left: thumbLeft,
+        top: thumbTop,
+        width: THUMB_R * 2,
+        height: THUMB_R * 2,
+        borderRadius: THUMB_R,
+        backgroundColor: DARK,
+        shadowColor: '#000',
+        shadowOpacity: 0.35,
+        shadowRadius: 2,
+        elevation: 4,
+      }} />
+    </View>
+  );
+}
+
+// ────────────────────────────────────────────────────────────
 type Props = {
   exposuresLeft: number;
   onCapture: (uri: string, width: number, height: number) => void;
@@ -57,6 +187,7 @@ export function FilmCameraScreen({ exposuresLeft, onCapture, onClose }: Props) {
   const [flash, setFlash]       = useState(false);
   const [shooting, setShooting] = useState(false);
   const [facing, setFacing]     = useState<Facing>('back');
+  const [zoom, setZoom]         = useState(0);
   const cameraRef               = useRef<CameraView>(null);
 
   // 常に横画面ロック
@@ -120,7 +251,7 @@ export function FilmCameraScreen({ exposuresLeft, onCapture, onClose }: Props) {
     return (
       <View style={s.body}>
         <StatusBar hidden />
-        <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="front" />
+        <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="front" flash={flash ? 'on' : 'off'} />
         {shooting && <View style={[s.shootFlash, StyleSheet.absoluteFill]} />}
 
         <View style={[s.topBar, { paddingTop: SAFE_H }]}>
@@ -139,6 +270,11 @@ export function FilmCameraScreen({ exposuresLeft, onCapture, onClose }: Props) {
             <TouchableOpacity style={s.shutter} onPress={shoot} activeOpacity={0.85} disabled={shooting}>
               <View style={s.shutterRing}>
                 <View style={[s.shutterInner, shooting && s.shutterPressed]} />
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.flashBtn} onPress={() => setFlash(f => !f)} activeOpacity={0.7}>
+              <View style={[s.flashBtnInner, flash && s.flashBtnActive]}>
+                <Text style={s.flashIcon}>⚡</Text>
               </View>
             </TouchableOpacity>
             <TouchableOpacity style={s.flipBtn} onPress={() => setFacing('back')} activeOpacity={0.7}>
@@ -181,7 +317,7 @@ export function FilmCameraScreen({ exposuresLeft, onCapture, onClose }: Props) {
         {/* ファインダー */}
         <View style={s.finderArea}>
           <View style={[s.finderOuter, { width: FINDER_W, height: FINDER_H, marginBottom: TOP_BAR_H - BOT_BAR_H }]}>
-            <CameraView ref={cameraRef} style={s.preview} flash={flash ? 'on' : 'off'} />
+            <CameraView ref={cameraRef} style={s.preview} flash={flash ? 'on' : 'off'} zoom={zoom} />
             {shooting && <View style={s.shootFlash} />}
           </View>
         </View>
@@ -211,6 +347,11 @@ export function FilmCameraScreen({ exposuresLeft, onCapture, onClose }: Props) {
       <View style={s.bottomBar}>
         <Text style={s.counterNum}>{exposuresLeft}</Text>
         <Text style={s.counterLabel}>EXP</Text>
+      </View>
+
+      {/* ── ズームダイアル：body 右上コーナーに絶対配置 ── */}
+      <View style={[s.dialCorner, { top: SAFE_H }]}>
+        <ZoomDial zoom={zoom} onChange={setZoom} />
       </View>
 
     </View>
@@ -271,6 +412,12 @@ const s = StyleSheet.create({
   },
   preview:    { flex: 1, borderRadius: 6, overflow: 'hidden' },
   shootFlash: { ...StyleSheet.absoluteFillObject, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.6)' },
+
+  dialCorner: {
+    position: 'absolute',
+    top: 0,
+    right: 12,
+  },
 
   controlsCol: {
     width: 80,

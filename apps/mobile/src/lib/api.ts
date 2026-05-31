@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import { token } from './token';
-import type { Album, FiltersResponse, InviteCode, Member, Movie, Photo, Todo, TokenResponse } from './types';
+import type { AiTransformResult, Album, FiltersResponse, InviteCode, Member, Movie, Photo, Todo, TokenResponse } from './types';
 
 function resolveApiUrl(): string {
   const fromEnv = process.env.EXPO_PUBLIC_API_URL;
@@ -104,7 +104,7 @@ export const api = {
   uploadPhoto: (
     albumId: string,
     asset: { uri: string; fileName?: string | null; mimeType?: string | null },
-    filterPreset?: string,
+    filter?: { preset?: string; presetB?: string; mix?: number; strength?: number },
   ) => {
     const form = new FormData();
     form.append('file', {
@@ -112,12 +112,23 @@ export const api = {
       name: asset.fileName ?? `photo-${Date.now()}.jpg`,
       type: asset.mimeType ?? 'image/jpeg',
     } as unknown as Blob);
-    // 省略時はサーバー側の既定プリセットで焼き込まれる
-    if (filterPreset) form.append('filter_preset', filterPreset);
+    // 省略時はサーバー側の既定プリセットで焼き込まれる。
+    // preset=主, presetB=混ぜる副, mix=混合比(0..1), strength=効き具合(0..1)
+    if (filter?.preset) form.append('filter_preset', filter.preset);
+    if (filter?.presetB) form.append('filter_preset_b', filter.presetB);
+    if (filter?.mix != null) form.append('filter_mix', String(filter.mix));
+    if (filter?.strength != null) form.append('filter_strength', String(filter.strength));
     return request<Photo>(`/albums/${albumId}/photos`, { method: 'POST', body: form }, true);
   },
 
   listFilters: () => request<FiltersResponse>('/filters', undefined, true),
+
+  aiTransformPhoto: (albumId: string, photoId: string, prompt: string) =>
+    request<AiTransformResult>(
+      `/albums/${albumId}/photos/${photoId}/ai-transform`,
+      { method: 'POST', body: JSON.stringify({ prompt }) },
+      true,
+    ),
 
   // スライドショー動画(MP4)の生成を開始する(非同期)。pending のジョブが返る。
   requestMovie: (albumId: string) =>

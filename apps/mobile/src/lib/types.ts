@@ -73,6 +73,9 @@ export type FiltersResponse = {
   realtime_preview_enabled: boolean;
 };
 
+// AI加工リクエストの結果（新しい Photo として返る）
+export type AiTransformResult = Photo;
+
 // 写真から生成するスライドショー動画(MP4)の生成ジョブ。
 export type Movie = {
   id: string;

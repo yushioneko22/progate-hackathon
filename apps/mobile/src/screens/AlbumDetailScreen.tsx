@@ -9,6 +9,7 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { api } from '../lib/api';
 import type { Album, FilterPreset, Photo } from '../lib/types';
 import { MovieExportButton } from '../components/MovieExportButton';
+import { Slider } from '../components/Slider';
 import { PhotoSelectScreen } from './PhotoSelectScreen';
 import { PhotoViewerScreen, type Origin } from './PhotoViewerScreen';
 import { ShakeRevealScreen } from './ShakeRevealScreen';
@@ -46,6 +47,21 @@ function swatchColor(cm: number[]): string {
   const ch = (r: number) =>
     Math.round(Math.max(0, Math.min(1, cm[r * 5] * g + cm[r * 5 + 1] * g + cm[r * 5 + 2] * g + cm[r * 5 + 4])) * 255);
   return `rgb(${ch(0)}, ${ch(1)}, ${ch(2)})`;
+}
+
+// 恒等行列(無加工)。強度ブレンドの補間先。
+const IDENTITY_CM = [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0];
+const lerpCm = (a: number[], b: number[], t: number) => a.map((x, i) => x + (b[i] - x) * t);
+
+// サーバーの presets.effective_preset と同じ補間をクライアントでも行い、
+// 「仕上がりトーン」スウォッチをライブ表示する(色行列だけで十分)。
+function effectiveMatrix(
+  primary: number[], secondary: number[] | null, mix: number, strength: number,
+): number[] {
+  let m = primary;
+  if (secondary && mix > 0) m = lerpCm(primary, secondary, mix);
+  if (strength < 1) m = lerpCm(IDENTITY_CM, m, strength);
+  return m;
 }
 
 const C = {
@@ -236,6 +252,11 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
   const [defaultPreset, setDefaultPreset] = useState('classic-film');
   const [pendingAsset, setPendingAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [selectedPreset, setSelectedPreset] = useState('classic-film');
+  // ブレンド設定: 効き具合 / 2フィルター混合の有無・副フィルター・混合比
+  const [strength, setStrength] = useState(1);
+  const [mixEnabled, setMixEnabled] = useState(false);
+  const [secondaryPreset, setSecondaryPreset] = useState<string | null>(null);
+  const [mix, setMix] = useState(0.5);
   // null = 確認中, false = 未開封（シェイク演出を表示）, true = 開封済み
   const [revealed, setRevealed] = useState<boolean | null>(null);
   const [filmCameraVisible, setFilmCameraVisible] = useState(false);
@@ -349,6 +370,9 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.6 });
     if (result.canceled) return;
     setSelectedPreset(defaultPreset);
+    setStrength(1);
+    setMixEnabled(false);
+    setMix(0.5);
     setPendingAsset(result.assets[0]);
   }
 
@@ -368,7 +392,7 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
     ]);
   }
 
-  // 選んだフィルターで焼き込みアップロード
+  // 選んだフィルター(ブレンド設定込み)で焼き込みアップロード
   async function confirmUpload(presetId: string) {
     if (!pendingAsset) return;
     const asset = pendingAsset;
@@ -376,7 +400,12 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
     setUploading(true);
     try {
       const upload = await downscaleForUpload(asset);
-      const photo = await api.uploadPhoto(album.id, upload, presetId);
+      const photo = await api.uploadPhoto(album.id, upload, {
+        preset: presetId,
+        presetB: mixEnabled ? secondaryPreset ?? undefined : undefined,
+        mix: mixEnabled ? mix : 0,
+        strength,
+      });
       setCount(c => c + 1);
       if (!isSealed) setPhotos(prev => [...prev, photo]);
       Alert.alert('保存しました', '写真をアルバムに追加しました');
@@ -409,6 +438,12 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
       />
     );
   }
+
+  // フィルター選択モーダル用: 現在の設定から「仕上がりトーン」を算出(ライブ表示)
+  const primaryCm = filters.find(f => f.id === selectedPreset)?.color_matrix ?? IDENTITY_CM;
+  const secondaryCm = filters.find(f => f.id === secondaryPreset)?.color_matrix ?? null;
+  const toneCm = effectiveMatrix(primaryCm, mixEnabled ? secondaryCm : null, mix, strength);
+  const toneColor = swatchColor(toneCm);
 
   return (
     <SafeAreaView style={s.safe}>
@@ -472,8 +507,17 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
       >
         <View style={s.filterBackdrop}>
           <View style={s.filterSheet}>
-            <Text style={s.filterTitle}>フィルターを選ぶ</Text>
-            <Text style={s.filterHint}>現像日に、選んだフィルムで焼き上がります</Text>
+            <View style={s.filterHeaderRow}>
+              <View>
+                <Text style={s.filterTitle}>フィルムを決める</Text>
+                <Text style={s.filterHint}>現像日に焼き上がります</Text>
+              </View>
+              {/* 仕上がりトーン(スライダー操作でライブ更新) */}
+              <View style={s.toneWrap}>
+                <View style={[s.toneDot, { backgroundColor: toneColor }]} />
+                <Text style={s.toneLabel}>仕上がり</Text>
+              </View>
+            </View>
 
             {pendingAsset && (
               <Image source={{ uri: pendingAsset.uri }} style={s.filterPreviewImg} resizeMode="cover" />
@@ -508,12 +552,55 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
               })}
             </ScrollView>
 
+            {/* 効き具合(強度) */}
+            <View style={s.sliderRow}>
+              <Text style={s.sliderLabel}>効き具合</Text>
+              <Text style={s.sliderValue}>{Math.round(strength * 100)}%</Text>
+            </View>
+            <Slider value={strength} onChange={setStrength} />
+
+            {/* 2つを混ぜる(任意) */}
+            <TouchableOpacity
+              style={s.mixToggle}
+              onPress={() => {
+                const next = !mixEnabled;
+                setMixEnabled(next);
+                if (next && !secondaryPreset) {
+                  setSecondaryPreset(filters.find(f => f.id !== selectedPreset)?.id ?? null);
+                }
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={s.mixToggleText}>{mixEnabled ? '▾' : '▸'}  2つのフィルムを混ぜる</Text>
+            </TouchableOpacity>
+
+            {mixEnabled && (
+              <>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filterRow}>
+                  {filters.filter(f => f.id !== selectedPreset).map(f => {
+                    const selected = f.id === secondaryPreset;
+                    return (
+                      <TouchableOpacity key={f.id} style={s.filterChip} onPress={() => setSecondaryPreset(f.id)} activeOpacity={0.8}>
+                        <View style={[s.filterSwatch, selected && s.filterSwatchSelected, { backgroundColor: swatchColor(f.color_matrix) }]} />
+                        <Text style={[s.filterChipText, selected && s.filterChipTextSelected]} numberOfLines={1}>{f.name}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+                <View style={s.sliderRow}>
+                  <Text style={s.sliderLabel}>混ぜる量</Text>
+                  <Text style={s.sliderValue}>{Math.round(mix * 100)}%</Text>
+                </View>
+                <Slider value={mix} onChange={setMix} />
+              </>
+            )}
+
             <TouchableOpacity
               style={s.filterConfirm}
               onPress={requestSaveConfirmation}
               activeOpacity={0.85}
             >
-              <Text style={s.filterConfirmText}>このフィルターで保存</Text>
+              <Text style={s.filterConfirmText}>このフィルムで保存</Text>
             </TouchableOpacity>
             <TouchableOpacity style={s.filterCancel} onPress={() => setPendingAsset(null)}>
               <Text style={s.filterCancelText}>キャンセル</Text>
@@ -750,8 +837,25 @@ const s = StyleSheet.create({
     paddingHorizontal: 20, paddingTop: 20, paddingBottom: 32,
     borderTopWidth: 1.5, borderTopColor: C.dark,
   },
-  filterTitle: { fontSize: 18, fontWeight: '800', color: C.dark, textAlign: 'center' },
-  filterHint: { fontSize: 12, color: C.muted, textAlign: 'center', marginTop: 4 },
+  filterHeaderRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+  },
+  filterTitle: { fontSize: 18, fontWeight: '800', color: C.dark },
+  filterHint: { fontSize: 12, color: C.muted, marginTop: 2 },
+  toneWrap: { alignItems: 'center', gap: 4 },
+  toneDot: {
+    width: 40, height: 40, borderRadius: 20,
+    borderWidth: 2, borderColor: C.dark,
+  },
+  toneLabel: { fontSize: 10, color: C.muted, fontWeight: '600' },
+  sliderRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginTop: 12, marginBottom: 2,
+  },
+  sliderLabel: { fontSize: 13, color: C.dark, fontWeight: '700' },
+  sliderValue: { fontSize: 13, color: C.muted, fontWeight: '600' },
+  mixToggle: { marginTop: 16, paddingVertical: 6 },
+  mixToggleText: { fontSize: 14, color: C.dark, fontWeight: '700' },
   filterPreviewImg: {
     width: '100%', aspectRatio: 4 / 3,
     borderRadius: 6, marginTop: 16, marginBottom: 8,
