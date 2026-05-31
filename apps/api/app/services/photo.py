@@ -25,6 +25,9 @@ class PhotoService:
         data: bytes,
         content_type: str,
         filter_preset: str | None = None,
+        filter_preset_b: str | None = None,
+        filter_mix: float = 0.0,
+        filter_strength: float = 1.0,
     ) -> PhotoRead:
         album = await self._repo.get_album(album_id)
         if album is None:
@@ -39,7 +42,13 @@ class PhotoService:
 
         # フィルターを焼き込む。原本も保持してリバーシブルにする(後から焼き直せる)。
         # 画像処理はCPUバウンドなので別スレッドに逃がし、イベントループを塞がない。
-        preset = presets.get_preset(filter_preset)
+        # primary/secondary のブレンドと強度(0..1)を反映した実効プリセットを作る。
+        preset = presets.effective_preset(
+            filter_preset,
+            secondary_id=filter_preset_b,
+            mix=filter_mix,
+            strength=filter_strength,
+        )
         try:
             filtered = await asyncio.to_thread(engine.apply_preset, data=data, preset=preset)
         except Exception:  # noqa: BLE001 - 破損画像など。原本でフォールバック。
@@ -65,7 +74,7 @@ class PhotoService:
             uploaded_by=user_id,
             storage_key=display_key,
             original_key=original_key,
-            filter_preset=preset["id"],
+            filter_preset=preset["id"][:50],
         )
         await self._session.commit()
         await self._session.refresh(photo)

@@ -33,6 +33,9 @@ async def upload_photo(
     current_user: CurrentUser,
     file: Annotated[UploadFile, File()],
     filter_preset: Annotated[str | None, Form()] = None,
+    filter_preset_b: Annotated[str | None, Form()] = None,
+    filter_mix: Annotated[float, Form()] = 0.0,
+    filter_strength: Annotated[float, Form()] = 1.0,
 ) -> PhotoRead:
     data = await file.read()
     return await service.upload(
@@ -41,4 +44,7 @@ async def upload_photo(
         data=data,
         content_type=file.content_type or "image/jpeg",
         filter_preset=filter_preset,
+        filter_preset_b=filter_preset_b,
+        filter_mix=filter_mix,
+        filter_strength=filter_strength,
     )
