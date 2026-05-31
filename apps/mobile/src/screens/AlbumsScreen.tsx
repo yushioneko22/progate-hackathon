@@ -207,13 +207,15 @@ function CreateModal({
                 {/* iOS: compact — タップするとシステムのポップオーバーが開く */}
                 {Platform.OS === 'ios' && (
                   <View style={s.iosPickerRow}>
-                    <Text style={s.iosPickerLabel}>{formatRevealAt(revealAt)}</Text>
                     <DateTimePicker
                       value={revealAt}
                       mode="datetime"
                       display="compact"
                       minimumDate={(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })()}
                       locale="ja-JP"
+                      textColor={C.dark}
+                      accentColor={C.dark}
+                      style={{ alignSelf: 'center', transform: [{ translateX: -10 }] }}
                       onChange={(event, d) => {
                         if (event.type === 'set' && d) setRevealAt(new Date(d));
                       }}
@@ -467,7 +469,7 @@ const s = StyleSheet.create({
   modalTitle: { fontSize: 18, fontWeight: '900', color: C.dark, marginBottom: 20 },
 
   field: { marginBottom: 16 },
-  label: { fontSize: 11, letterSpacing: 2, color: C.muted, fontWeight: '600', marginBottom: 8 },
+  label: { fontSize: 11, letterSpacing: 2, color: C.muted, fontWeight: '600', marginBottom: 8, textAlign: 'center' },
   input: {
     borderWidth: 1.5, borderColor: C.border, backgroundColor: '#fff',
     paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: C.dark,
@@ -482,9 +484,7 @@ const s = StyleSheet.create({
   error: { color: C.red, fontSize: 13, marginBottom: 8 },
 
   iosPickerRow: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     borderWidth: 1.5, borderColor: C.border,
     backgroundColor: '#fff',
     paddingHorizontal: 14, paddingVertical: 10,
