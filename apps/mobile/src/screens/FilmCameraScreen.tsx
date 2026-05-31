@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ScreenOrientation from 'expo-screen-orientation';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as Haptics from 'expo-haptics';
 
 const SAFE_H = Platform.OS === 'ios' ? 44 : 24;
@@ -19,6 +20,40 @@ const THUMB_R = 7;
 const DIAL_CX = DIAL_R;
 const DIAL_CY = DIAL_R + THUMB_R;
 const DIAL_H  = DIAL_R + THUMB_R; // コンテナ高さ
+
+// ファインダーと同じ横長比率(横:縦)。全撮影写真をこの比率に正規化する。
+const TARGET_ASPECT = 1.38;
+
+// 撮影直後の写真を「EXIFの向きを焼き込み + 横長1.38:1に中央クロップ」して
+// 正規化する。端末の向きや EXIF の差で縦横がバラつく問題を解消し、
+// グリッド/スライドショーで一貫したサイズ・向きにする。
+async function normalizeToLandscape(
+  uri: string,
+): Promise<{ uri: string; width: number; height: number }> {
+  // まず無加工で描画 → EXIF 適用後の正しい(upright)寸法を得る
+  const upright = await ImageManipulator.manipulate(uri).renderAsync();
+  const w = upright.width;
+  const h = upright.height;
+
+  // 中央を TARGET_ASPECT の横長にクロップ
+  let cropW: number;
+  let cropH: number;
+  if (w / h >= TARGET_ASPECT) {
+    cropH = h;
+    cropW = Math.round(h * TARGET_ASPECT);
+  } else {
+    cropW = w;
+    cropH = Math.round(w / TARGET_ASPECT);
+  }
+  const originX = Math.round((w - cropW) / 2);
+  const originY = Math.round((h - cropH) / 2);
+
+  const ctx = ImageManipulator.manipulate(uri);
+  ctx.crop({ originX, originY, width: cropW, height: cropH });
+  const ref = await ctx.renderAsync();
+  const result = await ref.saveAsync({ compress: 0.85, format: SaveFormat.JPEG });
+  return { uri: result.uri, width: result.width, height: result.height };
+}
 
 type Facing = 'back' | 'front';
 
@@ -147,7 +182,15 @@ export function FilmCameraScreen({ exposuresLeft, onCapture, onClose }: Props) {
     setShooting(true);
     try {
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.85 });
-      if (photo?.uri) onCapture(photo.uri, photo.width ?? 0, photo.height ?? 0);
+      if (photo?.uri) {
+        // 向き(EXIF)を焼き込み横長に正規化。失敗時は元写真にフォールバック。
+        try {
+          const n = await normalizeToLandscape(photo.uri);
+          onCapture(n.uri, n.width, n.height);
+        } catch {
+          onCapture(photo.uri, photo.width ?? 0, photo.height ?? 0);
+        }
+      }
     } finally {
       setShooting(false);
     }
