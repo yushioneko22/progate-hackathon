@@ -268,7 +268,7 @@ export function FilmCameraScreen({ exposuresLeft, onCapture, onClose }: Props) {
       </View>
 
       {/* ── ズームダイアル：body 右上コーナーに絶対配置 ── */}
-      <View style={[s.dialCorner, { top: TOP_BAR_H }]}>
+      <View style={[s.dialCorner, { top: SAFE_H }]}>
         <ZoomDial zoom={zoom} onChange={setZoom} />
       </View>
 
@@ -334,7 +334,7 @@ const s = StyleSheet.create({
   dialCorner: {
     position: 'absolute',
     top: 0,
-    right: 0,
+    right: 12,
   },
 
   controlsCol: {
