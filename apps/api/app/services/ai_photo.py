@@ -71,7 +71,7 @@ async def _call_gemini(*, image_bytes: bytes, prompt: str) -> bytes:
                 parts=[
                     types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
                     types.Part.from_text(
-                        f"この写真を次の指示に従って加工してください。出力は加工後の画像のみにしてください。\n指示: {prompt}"
+                        text=f"この写真を次の指示に従って加工してください。出力は加工後の画像のみにしてください。\n指示: {prompt}"
                     ),
                 ]
             )
