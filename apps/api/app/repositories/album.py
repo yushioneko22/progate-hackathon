@@ -1,13 +1,12 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.album import Album
 from app.models.album_member import AlbumMember
-from app.models.photo import Photo
 
 
 class AlbumRepository:
@@ -52,3 +51,26 @@ class AlbumRepository:
         self._session.add(member)
         await self._session.flush()
         return member
+
+    async def get(self, album_id: uuid.UUID) -> Album | None:
+        return await self._session.get(Album, album_id)
+
+    async def get_member(
+        self, *, album_id: uuid.UUID, user_id: uuid.UUID
+    ) -> AlbumMember | None:
+        result = await self._session.execute(
+            select(AlbumMember).where(
+                AlbumMember.album_id == album_id,
+                AlbumMember.user_id == user_id,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def list_members(self, album_id: uuid.UUID) -> list[AlbumMember]:
+        result = await self._session.execute(
+            select(AlbumMember)
+            .options(selectinload(AlbumMember.user))
+            .where(AlbumMember.album_id == album_id)
+            .order_by(AlbumMember.joined_at)
+        )
+        return list(result.scalars().all())
