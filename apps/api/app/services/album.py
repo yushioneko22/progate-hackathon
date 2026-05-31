@@ -53,6 +53,18 @@ class AlbumService:
         created = next(a for a in albums if a.id == album.id)
         return self._to_read(created, "owner")
 
+    async def delete_album(self, album_id: uuid.UUID, user_id: uuid.UUID) -> None:
+        member = await self._repo.get_member(album_id=album_id, user_id=user_id)
+        if member is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="album not found")
+        if member.role != "owner":
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                detail="only the owner can delete the album",
+            )
+        await self._repo.delete_by_id(album_id)
+        await self._session.commit()
+
     async def create_invite(
         self, album_id: uuid.UUID, user_id: uuid.UUID
     ) -> InviteCodeRead:
