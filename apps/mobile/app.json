@@ -1,8 +1,9 @@
 {
   "expo": {
-    "name": "Todo",
+    "name": "変ルンです",
     "slug": "todo",
     "version": "0.0.0",
+    "icon": "./assets/icon.png",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "scheme": [
@@ -18,7 +19,8 @@
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
         }
-      }
+      },
+      "appleTeamId": "7ZMS37JZR2"
     },
     "android": {
       "package": "com.progatehackathon.todo"
