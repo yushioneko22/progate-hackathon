@@ -55,40 +55,6 @@ async function normalizeToLandscape(
   return { uri: result.uri, width: result.width, height: result.height };
 }
 
-// ファインダーと同じ横長比率(横:縦)。全撮影写真をこの比率に正規化する。
-const TARGET_ASPECT = 1.38;
-
-// 撮影直後の写真を「EXIFの向きを焼き込み + 横長1.38:1に中央クロップ」して
-// 正規化する。端末の向きや EXIF の差で縦横がバラつく問題を解消し、
-// グリッド/スライドショーで一貫したサイズ・向きにする。
-async function normalizeToLandscape(
-  uri: string,
-): Promise<{ uri: string; width: number; height: number }> {
-  // まず無加工で描画 → EXIF 適用後の正しい(upright)寸法を得る
-  const upright = await ImageManipulator.manipulate(uri).renderAsync();
-  const w = upright.width;
-  const h = upright.height;
-
-  // 中央を TARGET_ASPECT の横長にクロップ
-  let cropW: number;
-  let cropH: number;
-  if (w / h >= TARGET_ASPECT) {
-    cropH = h;
-    cropW = Math.round(h * TARGET_ASPECT);
-  } else {
-    cropW = w;
-    cropH = Math.round(w / TARGET_ASPECT);
-  }
-  const originX = Math.round((w - cropW) / 2);
-  const originY = Math.round((h - cropH) / 2);
-
-  const ctx = ImageManipulator.manipulate(uri);
-  ctx.crop({ originX, originY, width: cropW, height: cropH });
-  const ref = await ctx.renderAsync();
-  const result = await ref.saveAsync({ compress: 0.85, format: SaveFormat.JPEG });
-  return { uri: result.uri, width: result.width, height: result.height };
-}
-
 type Facing = 'back' | 'front';
 
 // ── ズームダイアル ────────────────────────────────────────────
