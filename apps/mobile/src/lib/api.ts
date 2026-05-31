@@ -84,6 +84,9 @@ export const api = {
   listAlbums: () => request<Album[]>('/albums', undefined, true),
   createAlbum: (data: { title: string; reveal_date: string; max_exposures: number; bgm_url?: string }) =>
     request<Album>('/albums', { method: 'POST', body: JSON.stringify(data) }, true),
+  // アルバムを削除する(オーナーのみ)
+  deleteAlbum: (albumId: string) =>
+    request<void>(`/albums/${albumId}`, { method: 'DELETE' }, true),
 
   // --- メンバー共有 ---
   // オーナーが招待コードを発行する

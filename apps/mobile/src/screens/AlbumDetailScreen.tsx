@@ -268,6 +268,28 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
     }
   }
 
+  function handleDelete() {
+    Alert.alert(
+      'アルバムを削除',
+      `「${album.title}」を削除しますか？\n写真・メンバー・招待もすべて削除され、元に戻せません。`,
+      [
+        { text: 'キャンセル', style: 'cancel' },
+        {
+          text: '削除する',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.deleteAlbum(album.id);
+              onBack(); // 一覧へ戻ると再取得され、削除済みアルバムは消える
+            } catch (e) {
+              Alert.alert('エラー', e instanceof Error ? e.message : '削除に失敗しました');
+            }
+          },
+        },
+      ],
+    );
+  }
+
   // 現像日時になったら自動でOPENEDに切り替え
   useEffect(() => {
     if (album.status !== 'sealed') return;
@@ -405,6 +427,11 @@ export function AlbumDetailScreen({ album, onBack }: { album: Album; onBack: () 
             {inviteLoading
               ? <ActivityIndicator color={C.dark} size="small" />
               : <Text style={s.inviteBtnText}>招待</Text>}
+          </TouchableOpacity>
+        )}
+        {isOwner && (
+          <TouchableOpacity style={s.deleteBtn} onPress={handleDelete} activeOpacity={0.7}>
+            <Text style={s.deleteBtnText}>削除</Text>
           </TouchableOpacity>
         )}
         <View style={[s.headerBadge, isSealed ? s.headerBadgeRed : s.headerBadgeGreen]}>
@@ -582,6 +609,11 @@ const s = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 4, minWidth: 44, alignItems: 'center',
   },
   inviteBtnText: { fontSize: 12, color: '#F5EDD8', fontWeight: '700', letterSpacing: 1 },
+  deleteBtn: {
+    borderWidth: 1.5, borderColor: C.red,
+    paddingHorizontal: 10, paddingVertical: 4, alignItems: 'center',
+  },
+  deleteBtnText: { fontSize: 12, color: C.red, fontWeight: '700', letterSpacing: 1 },
 
   // 招待コードモーダル
   inviteBackdrop: {
