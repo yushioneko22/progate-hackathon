@@ -65,7 +65,7 @@ async def _call_gemini(*, image_bytes: bytes, prompt: str) -> bytes:
     client = genai.Client(api_key=settings.gemini_api_key)
 
     response = await client.aio.models.generate_content(
-        model="gemini-2.0-flash-preview-image-generation",
+        model="gemini-2.5-flash-image",
         contents=[
             types.Content(
                 parts=[
