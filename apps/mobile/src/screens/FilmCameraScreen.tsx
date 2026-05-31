@@ -8,9 +8,9 @@ const { width: SW } = Dimensions.get('window');
 const SAFE_TOP = Platform.OS === 'ios' ? 56 : 32;
 const SAFE_BOT = Platform.OS === 'ios' ? 44 : 24;
 
-// ファインダー寸法（正方形・小さめで覗き込む感）
+// ファインダー寸法（気持ち横長・小さめで覗き込む感）
 const FINDER_W = SW * 0.52;
-const FINDER_H = FINDER_W;
+const FINDER_H = FINDER_W * 0.82;
 const BORDER   = 18;
 
 type Props = {
